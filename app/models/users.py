@@ -1,18 +1,26 @@
 # app/models/users.py
 
-from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Integer, DateTime, text, CheckConstraint
 
-from datetime import datetime
 from app.database import Base
 from app.constants import UserStatus
+
+if TYPE_CHECKING:
+    from app.models.conversation_members import ConversationMember
+    from app.models.messages import Message
+    from app.models.friend_requests import FriendRequest
+    from app.models.friends import Friend
 
 
 class User(Base):
 
     __tablename__ = "users"
 
-    allowed = ", ".join(f"'{status.value}'" for status in UserStatus)
+    allowed_status = ", ".join(f"'{status.value}'" for status in UserStatus)
 
     __table_args__ = (
         CheckConstraint(
@@ -20,7 +28,7 @@ class User(Base):
             name="ck_users_failed_attempts_range",
         ),
         CheckConstraint(
-            f"status IN ({allowed})",
+            f"status IN ({allowed_status})",
             name="ck_users_status_valid",
         ),
     )
@@ -51,4 +59,32 @@ class User(Base):
 
     status: Mapped[str] = mapped_column(
         String(15), nullable=False, default=UserStatus.ACTIVE.value
+    )
+
+    conversation_members: Mapped[list["ConversationMember"]] = relationship(
+        "ConversationMember", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender")
+
+    sent_friend_requests: Mapped[list["FriendRequest"]] = relationship(
+        "FriendRequest",
+        foreign_keys="FriendRequest.sender_id",
+        back_populates="sender",
+        cascade="all, delete-orphan",
+    )
+
+    received_friend_requests: Mapped[list["FriendRequest"]] = relationship(
+        "FriendRequest",
+        foreign_keys="FriendRequest.receiver_id",
+        back_populates="receiver",
+        cascade="all, delete-orphan",
+    )
+
+    friendships: Mapped[list["Friend"]] = relationship(
+        "Friend", foreign_keys="Friend.user_id", back_populates="user"
+    )
+
+    friendships_as_friend: Mapped[list["Friend"]] = relationship(
+        "Friend", foreign_keys="Friend.friend_id", back_populates="friend"
     )

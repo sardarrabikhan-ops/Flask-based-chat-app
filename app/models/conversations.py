@@ -1,11 +1,17 @@
 # app/models/conversations.py
 
-from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, DateTime, text, CheckConstraint
 
-from datetime import datetime
 from app.database import Base
 from app.constants import ConversationType, ConversationStatus
+
+if TYPE_CHECKING:
+    from app.models.conversation_members import ConversationMember
+    from app.models.messages import Message
 
 
 class Conversation(Base):
@@ -44,4 +50,14 @@ class Conversation(Base):
 
     status: Mapped[str] = mapped_column(
         String(15), default=ConversationStatus.ACTIVE.value, nullable=False
+    )
+
+    members: Mapped[list["ConversationMember"]] = relationship(
+        "ConversationMember",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
+
+    messages: Mapped[list["Message"]] = relationship(
+        "Message", back_populates="conversation", cascade="all, delete-orphan"
     )
