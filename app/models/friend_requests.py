@@ -15,6 +15,7 @@ from sqlalchemy import (
 
 from app.database import Base
 from app.constants import FriendRequestStatus
+from app.utils import get_enum_values
 
 if TYPE_CHECKING:
     from app.models.users import User
@@ -24,7 +25,7 @@ class FriendRequest(Base):
 
     __tablename__ = "friend_requests"
 
-    allowed_status = ", ".join(f"'{status.value}'" for status in FriendRequestStatus)
+    allowed_status = get_enum_values(FriendRequestStatus)
 
     __table_args__ = (
         CheckConstraint(
@@ -57,7 +58,7 @@ class FriendRequest(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped[str] = mapped_column(
+    status: Mapped["FriendRequestStatus"] = mapped_column(
         String(15), default=FriendRequestStatus.PENDING.value, nullable=False
     )
 

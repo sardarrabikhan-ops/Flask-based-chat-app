@@ -4,3 +4,4 @@ venv
 planning
 .gitinore
 *.zip
+*.pyc

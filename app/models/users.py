@@ -8,6 +8,7 @@ from sqlalchemy import String, Integer, DateTime, text, CheckConstraint
 
 from app.database import Base
 from app.constants import UserStatus
+from app.utils import get_enum_values
 
 if TYPE_CHECKING:
     from app.models.conversation_members import ConversationMember
@@ -20,7 +21,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    allowed_status = ", ".join(f"'{status.value}'" for status in UserStatus)
+    allowed_status = get_enum_values(UserStatus)
 
     __table_args__ = (
         CheckConstraint(
@@ -57,7 +58,7 @@ class User(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped[str] = mapped_column(
+    status: Mapped["UserStatus"] = mapped_column(
         String(15), nullable=False, default=UserStatus.ACTIVE.value
     )
 

@@ -1,0 +1,8 @@
+# app/repositories/__init__.py
+
+from app.repositories.users_repo import UserRepository
+from app.repositories.conversations_repo import ConversationRepository
+from app.repositories.conversation_members_repo import ConversationMemberRepository
+from app.repositories.friends_repo import FriendRepository
+from app.repositories.friend_requests_repo import FriendRequestRepository
+from app.repositories.messages_repo import MessageRepository

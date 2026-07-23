@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, text, CheckConstraint
+from sqlalchemy import String, DateTime, text, CheckConstraint, ForeignKey
 
 from app.database import Base
 from app.constants import ConversationType, ConversationStatus
+from app.utils import get_enum_values
 
 if TYPE_CHECKING:
     from app.models.conversation_members import ConversationMember
@@ -18,10 +19,8 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    allowed_status = ", ".join(f"'{status.value}'" for status in ConversationStatus)
-    allowed_type = ", ".join(
-        f"'{conversation_type .value}'" for conversation_type in ConversationType
-    )
+    allowed_status = get_enum_values(ConversationStatus)
+    allowed_type = get_enum_values(ConversationType)
 
     __table_args__ = (
         CheckConstraint(
@@ -32,13 +31,17 @@ class Conversation(Base):
             f"status IN ({allowed_status})",
             name="ck_conversations_status_valid",
         ),
+        CheckConstraint(
+            "conversation_type = 'private' OR name IS NOT NULL",
+            name="ck_conversations_group_requires_name",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    name: Mapped[str | None] = mapped_column(String(30), default=None, nullable=True)
+    name: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
-    conversation_type: Mapped[str] = mapped_column(
+    conversation_type: Mapped["ConversationType"] = mapped_column(
         String(15), default=ConversationType.PRIVATE.value, nullable=False
     )
 
@@ -48,7 +51,7 @@ class Conversation(Base):
         nullable=False,
     )
 
-    status: Mapped[str] = mapped_column(
+    status: Mapped["ConversationStatus"] = mapped_column(
         String(15), default=ConversationStatus.ACTIVE.value, nullable=False
     )
 

@@ -8,6 +8,7 @@ from sqlalchemy import String, DateTime, text, CheckConstraint, ForeignKey
 
 from app.database import Base
 from app.constants import FriendStatus
+from app.utils import get_enum_values
 
 if TYPE_CHECKING:
     from app.models.users import User
@@ -17,7 +18,7 @@ class Friend(Base):
 
     __tablename__ = "friends"
 
-    allowed_status = ", ".join(f"'{status.value}'" for status in FriendStatus)
+    allowed_status = get_enum_values(FriendStatus)
 
     __table_args__ = (
         CheckConstraint(
@@ -42,7 +43,7 @@ class Friend(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped[str] = mapped_column(
+    status: Mapped["FriendStatus"] = mapped_column(
         String(15), default=FriendStatus.ACTIVE.value, nullable=False
     )
 
