@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: e00c719cea41
+Revision ID: 57974a129ac1
 Revises: 
-Create Date: 2026-07-23 13:33:19.993209
+Create Date: 2026-07-24 20:00:38.200371
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'e00c719cea41'
+revision: str = '57974a129ac1'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,15 +34,15 @@ def upgrade() -> None:
     )
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('firstname', sa.String(length=15), nullable=False),
-    sa.Column('lastname', sa.String(length=15), nullable=False),
+    sa.Column('firstname', sa.String(length=50), nullable=False),
+    sa.Column('lastname', sa.String(length=50), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
-    sa.Column('phone_number', sa.String(length=13), nullable=False),
+    sa.Column('phone_number', sa.String(length=16), nullable=False),
     sa.Column('password', sa.String(length=255), nullable=False),
     sa.Column('failed_attempts', sa.Integer(), nullable=False),
     sa.Column('lock_until', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.String(length=15), nullable=False),
+    sa.Column('status', sa.Enum('active', 'blocked', name='userstatus'), nullable=False),
     sa.CheckConstraint("status IN ('active', 'blocked')", name='ck_users_status_valid'),
     sa.CheckConstraint('failed_attempts BETWEEN 0 AND 15', name='ck_users_failed_attempts_range'),
     sa.PrimaryKeyConstraint('id'),

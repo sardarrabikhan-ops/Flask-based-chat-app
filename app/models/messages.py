@@ -28,6 +28,9 @@ class Message(Base):
         ),
     )
 
+    def __repr__(self) -> str:
+        return f"Message(id={self.id}, sender_id={self.sender_id}, conversation_id={self.conversation_id}, content={self.content}, status={self.status}, created_at={self.created_at})"
+
     id: Mapped[int] = mapped_column(primary_key=True)
 
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)

@@ -28,6 +28,9 @@ class ConversationMember(Base):
         ),
     )
 
+    def __repr__(self) -> str:
+        return f"ConversationMember(user_id={self.user_id}, conversation_id={self.conversation_id}, role={self.role}, joined_at={self.joined_at})"
+
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )

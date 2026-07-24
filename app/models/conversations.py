@@ -37,6 +37,9 @@ class Conversation(Base):
         ),
     )
 
+    def __repr__(self) -> str:
+        return f"Conversation(id={self.id}, conversation_type={self.conversation_type}, status={self.status}, created_at={self.created_at})"
+
     id: Mapped[int] = mapped_column(primary_key=True)
 
     name: Mapped[str | None] = mapped_column(String(30), nullable=True)

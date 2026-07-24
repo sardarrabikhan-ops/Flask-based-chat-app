@@ -22,6 +22,14 @@ class UserRepository:
         statement = select(User).where(User.phone_number == phone_number)
         return self.session.scalar(statement)
 
+    def exists_by_email(self, email: str) -> bool:
+        statement = select(User).where(User.email == email)
+        return self.session.scalar(statement) is not None
+
+    def exists_by_phone_number(self, phone_number: str) -> bool:
+        statement = select(User).where(User.phone_number == phone_number)
+        return self.session.scalar(statement) is not None
+
     def create(self, user: User) -> User:
         self.session.add(user)
         return user

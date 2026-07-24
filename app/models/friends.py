@@ -29,6 +29,9 @@ class Friend(Base):
         ),
     )
 
+    def __repr__(self) -> str:
+        return f"Friend(user_id={self.user_id}, friend_id={self.friend_id}, status={self.status}, created_at={self.created_at})"
+
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )

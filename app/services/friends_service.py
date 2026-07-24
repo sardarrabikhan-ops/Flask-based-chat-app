@@ -1,0 +1,1 @@
+# app/services/friends_service.py
