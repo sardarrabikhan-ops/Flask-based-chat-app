@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import (
-    String,
     DateTime,
     text,
     CheckConstraint,
     UniqueConstraint,
     ForeignKey,
+    Enum,
 )
 
 from app.database import Base
@@ -42,7 +42,6 @@ class FriendRequest(Base):
         ),
     )
 
-    
     def __repr__(self) -> str:
         return f"FriendRequest(id={self.id}, sender_id={self.sender_id}, receiver_id={self.receiver_id}, status={self.status}, created_at={self.created_at})"
 
@@ -62,8 +61,14 @@ class FriendRequest(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped["FriendRequestStatus"] = mapped_column(
-        String(15), default=FriendRequestStatus.PENDING.value, nullable=False
+    status: Mapped[FriendRequestStatus] = mapped_column(
+        Enum(
+            FriendRequestStatus,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="friendrequeststatus",
+        ),
+        nullable=False,
+        default=FriendRequestStatus.PENDING,
     )
 
     sender: Mapped["User"] = relationship(

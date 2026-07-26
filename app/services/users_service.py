@@ -6,7 +6,7 @@ from app.models import User
 from app.repositories import UserRepository
 
 from app.utils import hash_password, format_phone_number, verify_password, format_time
-from app.validators import RegisterValidator
+from app.validators import RegisterValidator, LoginValidator
 
 from app.constants import (
     UserStatus,
@@ -14,11 +14,14 @@ from app.constants import (
     MAX_LOGIN_ATTEMPTS,
     LOGIN_WARNING_THRESHOLD,
 )
+from app.schemas import ServiceResult
 
 from datetime import datetime, UTC
+from typing import Sequence
 
 
 class UserService:
+    """Provides user-related business logic."""
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -32,10 +35,17 @@ class UserService:
         phone_number: str | None,
         password: str | None,
         confirm_password: str | None,
-    ) -> dict[str, bool | dict | User]:
+    ) -> ServiceResult[User]:
+        """
+        Register a new user.
 
-        errors = {}
+        Returns:
+            ServiceResult containing the created user or validation errors.
+        """
 
+        errors: dict[str, str] = {}
+
+        # Validation
         if error := RegisterValidator.firstname(firstname):
             errors["firstname"] = error
 
@@ -52,19 +62,22 @@ class UserService:
             errors["password"] = error
 
         if errors:
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
+        # Tell the type checker these values are no longer None.
         assert firstname is not None
         assert lastname is not None
         assert email is not None
         assert phone_number is not None
         assert password is not None
 
+        # normalizing fields
         firstname = firstname.strip()
         lastname = lastname.strip()
         email = email.strip().lower()
         phone_number = phone_number.strip()
 
+        # Check uniqueness.
         if error := RegisterValidator.confirm_password(password, confirm_password):
             errors["confirm_password"] = error
 
@@ -79,8 +92,9 @@ class UserService:
             )
 
         if errors:
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
+        # Format values for storage.
         password = hash_password(password)
         phone_number = format_phone_number(phone_number)
 
@@ -94,70 +108,253 @@ class UserService:
 
         user = self.repository.create(user)
 
-        return {"success": True, "data": user}
+        return ServiceResult.ok(user)
 
-    def login(
-        self, email: str | None, password: str | None
-    ) -> dict[str, bool | dict | User]:
+    def login(self, email: str | None, password: str | None) -> ServiceResult[User]:
+        """
+        Authenticate a user.
 
-        errors = {}
+        Returns:
+            ServiceResult containing the authenticated user or login errors.
+        """
 
-        if not email or not email.strip():
-            errors["email"] = "Email is required."
+        errors: dict[str, str] = {}
 
-        if not password or not password.strip():
-            errors["password"] = "Password is required."
+        # Validating fields
+        if error := LoginValidator.email_address(email):
+            errors["email"] = error
+
+        if error := LoginValidator.password(password):
+            errors["password"] = error
 
         if errors:
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
+        # Tell the type checker these values are no longer None.
         assert email is not None
         assert password is not None
 
+        # normalizing fields
         email = email.strip().lower()
 
         user = self.repository.get_by_email(email)
 
+        # validating existence
         if user is None:
             errors["email"] = "Incorrect email or password."
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
+        # validating status
         if user.status == UserStatus.BLOCKED:
-            errors["status"] = "Your account has been blocked. Please contact support."
-            return {"success": False, "errors": errors}
+            errors["account"] = "Your account has been blocked. Please contact support."
+            return ServiceResult.fail(errors)
 
+        # Verify account lock time.
         current_time = datetime.now(UTC)
         if user.lock_until and current_time < user.lock_until:
             free_time = format_time((user.lock_until - current_time).total_seconds())
-            errors["lock_until"] = (
+            errors["account"] = (
                 f"Your account is temporarily locked. Please try again after {free_time}."
             )
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
+        # verifying password
         if not verify_password(password, user.password):
 
             user.failed_attempts += 1
 
             if user.failed_attempts in LOGIN_LOCKS:
                 user.lock_until = current_time + LOGIN_LOCKS[user.failed_attempts]
-                errors["locked"] = (
-                    f"Account is locked for {format_time(LOGIN_LOCKS[user.failed_attempts].total_seconds())}!"
+                errors["account"] = (
+                    f"Your account is locked for {format_time(LOGIN_LOCKS[user.failed_attempts].total_seconds())}!"
                 )
 
             elif user.failed_attempts == MAX_LOGIN_ATTEMPTS:
                 user.status = UserStatus.BLOCKED
-                errors["status"] = (
+                errors["account"] = (
                     "Your account has been blocked. Please contact support."
                 )
 
             elif user.failed_attempts > LOGIN_WARNING_THRESHOLD:
-                errors["locked"] = (
-                    "Warning: Too many failed login attempts. Your account will be blocked after 15 failed attempts."
+                remaining = MAX_LOGIN_ATTEMPTS - user.failed_attempts
+                errors["account"] = (
+                    f"Warning: {remaining} login attempts remaining before your account is blocked."
                 )
 
             errors["email"] = "Incorrect email or password."
-            return {"success": False, "errors": errors}
+            return ServiceResult.fail(errors)
 
         user.failed_attempts = 0
         user.lock_until = None
-        return {"success": True, "data": user}
+
+        return ServiceResult.ok(user)
+
+    def get_all(
+        self,
+        status: UserStatus | None = UserStatus.ACTIVE,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ServiceResult[Sequence[User]]:
+        """Return all users."""
+
+        users = self.repository.get_all(
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+        return ServiceResult.ok(users)
+
+    def get_by_id(self, user_id: int | None) -> ServiceResult[User]:
+        """Return the user with the given ID"""
+
+        if user_id is None:
+            return ServiceResult.fail({"user_id": "User ID is required."})
+
+        assert user_id is not None
+
+        user = self.repository.get_by_id(user_id)
+
+        if user is None:
+            return ServiceResult.fail({"user_id": "User not found."})
+
+        return ServiceResult.ok(user)
+
+    def get_by_email(self, email: str | None) -> ServiceResult[User]:
+        """Return the user with the given email"""
+
+        if error := LoginValidator.email_address(email):
+            return ServiceResult.fail({"email": error})
+
+        assert email is not None
+
+        email = email.strip().lower()
+
+        user = self.repository.get_by_email(email)
+
+        if user is None:
+            return ServiceResult.fail({"email": "User not found."})
+
+        return ServiceResult.ok(user)
+
+    def update_profile(
+        self,
+        user_id: int | None,
+        firstname: str | None = None,
+        lastname: str | None = None,
+        phone_number: str | None = None,
+    ) -> ServiceResult[User]:
+        """
+        Update a user's profile.
+
+        Returns:
+            ServiceResult containing the updated user or validation errors.
+        """
+
+        if user_id is None:
+            return ServiceResult.fail({"user_id": "User ID is required."})
+
+        user: User | None = self.repository.get_by_id(user_id)
+
+        errors: dict[str, str] = {}
+
+        if user is None:
+            errors["user_id"] = "User Not found."
+            return ServiceResult.fail(errors)
+
+        if firstname is not None:
+
+            if error := RegisterValidator.firstname(firstname):
+                errors["firstname"] = error
+
+            else:
+                user.firstname = firstname.strip()
+
+        if lastname is not None:
+
+            if error := RegisterValidator.lastname(lastname):
+                errors["lastname"] = error
+
+            else:
+                user.lastname = lastname.strip()
+
+        if phone_number is not None:
+
+            if error := RegisterValidator.phone_number(phone_number):
+                errors["phone_number"] = error
+
+            elif self.repository.exists_by_phone_number_except_user(user_id, phone_number):
+                errors["phone_number"] = "Phone number already exists."
+
+            else:
+                user.phone_number = format_phone_number(phone_number)
+
+        if errors:
+            return ServiceResult.fail(errors)
+
+        return ServiceResult.ok(user)
+
+    def change_password(
+        self,
+        user_id: int | None,
+        current_password: str | None,
+        new_password: str | None,
+        confirm_password: str | None,
+    ) -> ServiceResult[User]:
+
+        if user_id is None:
+            return ServiceResult.fail({"user_id": "User ID is required."})
+
+        assert user_id is not None
+
+        user: User | None = self.repository.get_by_id(user_id)
+
+        errors: dict[str, str] = {}
+
+        if user is None:
+            errors["user_id"] = "User Not found."
+            return ServiceResult.fail(errors)
+
+        if error := LoginValidator.password(current_password):
+            errors["current_password"] = error
+
+        if error := LoginValidator.password(new_password):
+            errors["new_password"] = error
+
+        if errors:
+            return ServiceResult.fail(errors)
+
+        assert current_password is not None
+        assert new_password is not None
+
+        if error := RegisterValidator.confirm_password(new_password, confirm_password):
+            errors["confirm_password"] = error
+
+        if not verify_password(current_password, user.password):
+            errors["current_password"] = "Current password is incorrect."
+
+        if verify_password(new_password, user.password):
+            errors["new_password"] = (
+                "New password must be different from the current password."
+            )
+
+        if errors:
+            return ServiceResult.fail(errors)
+
+        user.password = hash_password(new_password)
+        return ServiceResult.ok(user)
+
+    def block(self, user_id: int | None) -> ServiceResult[User]:
+
+        if user_id is None:
+            return ServiceResult.fail({"user_id": "User ID is required."})
+
+        user: User | None = self.repository.get_by_id(user_id)
+
+        errors: dict[str, str] = {}
+
+        if user is None:
+            errors["user_id"] = "User Not found."
+            return ServiceResult.fail(errors)
+
+        user.status = UserStatus.BLOCKED
+        return ServiceResult.ok(user)

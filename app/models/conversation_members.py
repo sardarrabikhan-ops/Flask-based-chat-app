@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from datetime import datetime
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, text, CheckConstraint, ForeignKey
+from sqlalchemy import DateTime, text, CheckConstraint, ForeignKey, Enum
 
 from app.database import Base
 from app.constants import ConversationMemberRole
@@ -45,8 +45,14 @@ class ConversationMember(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    role: Mapped["ConversationMemberRole"] = mapped_column(
-        String(15), default=ConversationMemberRole.MEMBER.value, nullable=False
+    role: Mapped[ConversationMemberRole] = mapped_column(
+        Enum(
+            ConversationMemberRole,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="conversationmemberrole",
+        ),
+        nullable=False,
+        default=ConversationMemberRole.MEMBER,
     )
 
     user: Mapped["User"] = relationship("User", back_populates="conversation_members")

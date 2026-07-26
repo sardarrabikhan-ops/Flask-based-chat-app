@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: 57974a129ac1
+Revision ID: 63104f36a764
 Revises: 
-Create Date: 2026-07-24 20:00:38.200371
+Create Date: 2026-07-26 21:25:40.472410
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '57974a129ac1'
+revision: str = '63104f36a764'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,9 +24,9 @@ def upgrade() -> None:
     op.create_table('conversations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=30), nullable=True),
-    sa.Column('conversation_type', sa.String(length=15), nullable=False),
+    sa.Column('conversation_type', sa.Enum('private', 'group', name='conversationtype'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.String(length=15), nullable=False),
+    sa.Column('status', sa.Enum('active', 'deleted', 'archived', name='conversationstatus'), nullable=False),
     sa.CheckConstraint("conversation_type = 'private' OR name IS NOT NULL", name='ck_conversations_group_requires_name'),
     sa.CheckConstraint("conversation_type IN ('private', 'group')", name='ck_conversations_conversation_type_valid'),
     sa.CheckConstraint("status IN ('active', 'deleted', 'archived')", name='ck_conversations_status_valid'),
@@ -53,7 +53,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
     sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('role', sa.String(length=15), nullable=False),
+    sa.Column('role', sa.Enum('admin', 'member', name='conversationmemberrole'), nullable=False),
     sa.CheckConstraint("role IN ('admin', 'member')", name='ck_conversation_members_role_valid'),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -64,7 +64,7 @@ def upgrade() -> None:
     sa.Column('sender_id', sa.Integer(), nullable=False),
     sa.Column('receiver_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.String(length=15), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'accepted', 'rejected', name='friendrequeststatus'), nullable=False),
     sa.CheckConstraint("status IN ('pending', 'accepted', 'rejected')", name='ck_friend_requests_status_valid'),
     sa.CheckConstraint('sender_id <> receiver_id', name='ck_friend_requests_not_self'),
     sa.ForeignKeyConstraint(['receiver_id'], ['users.id'], ondelete='CASCADE'),
@@ -76,7 +76,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('friend_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.String(length=15), nullable=False),
+    sa.Column('status', sa.Enum('active', 'removed', name='friendstatus'), nullable=False),
     sa.CheckConstraint("status IN ('active', 'removed')", name='ck_friends_status_valid'),
     sa.CheckConstraint('user_id < friend_id', name='ck_friends_user_id_less_than_friend_id'),
     sa.ForeignKeyConstraint(['friend_id'], ['users.id'], ondelete='CASCADE'),
@@ -89,7 +89,7 @@ def upgrade() -> None:
     sa.Column('conversation_id', sa.Integer(), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.String(length=15), nullable=False),
+    sa.Column('status', sa.Enum('active', 'deleted', name='messagestatus'), nullable=False),
     sa.CheckConstraint("status IN ('active', 'deleted')", name='ck_messages_status_valid'),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
     sa.ForeignKeyConstraint(['sender_id'], ['users.id'], ),

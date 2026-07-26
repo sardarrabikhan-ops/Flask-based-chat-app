@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, text, CheckConstraint, ForeignKey
+from sqlalchemy import DateTime, text, CheckConstraint, ForeignKey, Enum
 
 from app.database import Base
 from app.constants import FriendStatus
@@ -46,8 +46,14 @@ class Friend(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped["FriendStatus"] = mapped_column(
-        String(15), default=FriendStatus.ACTIVE.value, nullable=False
+    status: Mapped[FriendStatus] = mapped_column(
+        Enum(
+            FriendStatus,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="friendstatus",
+        ),
+        nullable=False,
+        default=FriendStatus.ACTIVE,
     )
 
     user: Mapped["User"] = relationship(

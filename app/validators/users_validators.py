@@ -13,7 +13,7 @@ from app.constants import (
     EMAIL_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,
-    PASSWORD_SPECIAL_CHARACTERS
+    PASSWORD_SPECIAL_CHARACTERS,
 )
 
 
@@ -164,5 +164,32 @@ class RegisterValidator:
 
         if confirm_password != password:
             return "Passwords do not match."
+
+        return None
+
+
+class LoginValidator:
+
+    @staticmethod
+    def email_address(email: str | None) -> str | None:
+        if not email:
+            return "Email is required."
+
+        email = email.strip()
+
+        if not email:
+            return "Email is required."
+
+        return None
+
+    @staticmethod
+    def password(password: str | None) -> str | None:
+        if not password:
+            return "Password is required."
+
+        password = password.strip()
+
+        if not password:
+            return "Password is required."
 
         return None

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Text, DateTime, text, CheckConstraint, ForeignKey
+from sqlalchemy import Text, DateTime, text, CheckConstraint, ForeignKey, Enum
 
 from app.database import Base
 from app.constants import MessageStatus
@@ -47,8 +47,14 @@ class Message(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    status: Mapped["MessageStatus"] = mapped_column(
-        String(15), default=MessageStatus.ACTIVE.value, nullable=False
+    status: Mapped[MessageStatus] = mapped_column(
+        Enum(
+            MessageStatus,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="messagestatus",
+        ),
+        nullable=False,
+        default=MessageStatus.ACTIVE,
     )
 
     sender: Mapped["User"] = relationship("User", back_populates="messages")

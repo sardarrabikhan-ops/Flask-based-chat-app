@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, text, CheckConstraint, ForeignKey
+from sqlalchemy import String, DateTime, text, CheckConstraint, Enum
 
 from app.database import Base
 from app.constants import ConversationType, ConversationStatus
@@ -44,8 +44,14 @@ class Conversation(Base):
 
     name: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
-    conversation_type: Mapped["ConversationType"] = mapped_column(
-        String(15), default=ConversationType.PRIVATE.value, nullable=False
+    conversation_type: Mapped[ConversationType] = mapped_column(
+        Enum(
+            ConversationType,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="conversationtype",
+        ),
+        nullable=False,
+        default=ConversationType.PRIVATE,
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -54,8 +60,14 @@ class Conversation(Base):
         nullable=False,
     )
 
-    status: Mapped["ConversationStatus"] = mapped_column(
-        String(15), default=ConversationStatus.ACTIVE.value, nullable=False
+    status: Mapped[ConversationStatus] = mapped_column(
+        Enum(
+            ConversationStatus,
+            values_callable=lambda enum: [e.value for e in enum],
+            name="conversationstatus",
+        ),
+        nullable=False,
+        default=ConversationStatus.ACTIVE,
     )
 
     members: Mapped[list["ConversationMember"]] = relationship(
