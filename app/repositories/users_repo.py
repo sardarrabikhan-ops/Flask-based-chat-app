@@ -1,6 +1,6 @@
 # app/repositories/users_repo.py
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, func, case
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -22,6 +22,7 @@ class UserRepository:
         status: UserStatus | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        order_by: str | None = None,
     ) -> Sequence[User]:
         statement = select(User)
 
@@ -34,11 +35,57 @@ class UserRepository:
         if limit is not None:
             statement = statement.limit(limit)
 
+        if order_by is not None:
+            statement = statement.order_by(order_by)
+
         return self.session.scalars(statement).all()
 
     def get_by_email(self, email: str) -> User | None:
         statement = select(User).where(User.email == email)
         return self.session.scalar(statement)
+
+    def search_by_name(
+        self, name: str, status: UserStatus | None = None, limit: int | None = None, offset: int | None = None
+    ) -> Sequence[User]:
+
+        exact = name
+        starts = f"{name}%"
+        contains = f"%{name}%"
+
+        full_name = func.concat(User.firstname, " ", User.lastname)
+        full_name_reverse = func.concat(User.lastname, " ", User.firstname)
+
+        rank = case(
+            (full_name.ilike(exact), 0),
+            (full_name.ilike(starts), 1),
+            (full_name.ilike(contains), 2),
+            (full_name_reverse.ilike(exact), 3),
+            (full_name_reverse.ilike(starts), 4),
+            (full_name_reverse.ilike(contains), 5),
+            else_=6,
+        )
+
+        statement = (
+            select(User)
+            .where(
+                or_(
+                    full_name.ilike(contains),
+                    full_name_reverse.ilike(contains),
+                )
+            )
+            .order_by(rank, User.firstname, User.lastname)
+        )
+
+        if status is not None:
+            statement = statement.where(User.status == status)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
+        return self.session.scalars(statement).all()
 
     def get_by_phone_number(self, phone_number: str) -> User | None:
         statement = select(User).where(User.phone_number == phone_number)

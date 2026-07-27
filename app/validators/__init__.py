@@ -2,4 +2,4 @@
 
 
 from app.validators.users_validators import RegisterValidator, LoginValidator
-from app.validators.conersations_validators import ConversationCreationValidator
+from app.validators.conersations_validators import ConversationValidator

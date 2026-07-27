@@ -8,7 +8,7 @@ from app.constants import (
 )
 
 
-class ConversationCreationValidator:
+class ConversationValidator:
 
     @staticmethod
     def name(name: str | None) -> str | None:

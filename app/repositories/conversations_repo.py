@@ -1,6 +1,6 @@
 # app/repositories/conversations_repo.py
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, case
 from sqlalchemy.orm import Session
 
 from app.models import Conversation
@@ -17,17 +17,40 @@ class ConversationRepository:
     def get_by_id(self, conversation_id: int) -> Conversation | None:
         return self.session.get(Conversation, conversation_id)
 
-    def get_by_name(self, conversation_name: str) -> Sequence[Conversation]:
-        statement = select(Conversation).where(Conversation.name == conversation_name)
-        return self.session.scalars(statement).all()
-
-    def get_active_by_name(
-        self, conversation_name: str
+    def search_by_name(
+        self,
+        conversation_name: str,
+        status: ConversationStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> Sequence[Conversation]:
-        statement = select(Conversation).where(
-            Conversation.name == conversation_name,
-            Conversation.status != ConversationStatus.DELETED.value,
+
+        exact = conversation_name
+        starts = f"{conversation_name}%"
+        contains = f"%{conversation_name}%"
+
+        rank = case(
+            (Conversation.name.ilike(exact), 0),
+            (Conversation.name.ilike(starts), 1),
+            (Conversation.name.ilike(contains), 2),
+            else_=3,
         )
+
+        statement = (
+            select(Conversation)
+            .where(Conversation.name.ilike(contains))
+            .order_by(rank, Conversation.name)
+        )
+
+        if status is not None:
+            statement = statement.where(Conversation.status == status)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
         return self.session.scalars(statement).all()
 
     def create(self, conversation: Conversation) -> Conversation:

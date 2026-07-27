@@ -6,6 +6,7 @@ from datetime import timedelta
 
 class UserStatus(Enum):
     ACTIVE = "active"
+    DELETED = "deleted"
     BLOCKED = "blocked"
 
 
@@ -32,6 +33,9 @@ class FriendStatus(Enum):
 
 
 class MessageStatus(Enum):
+    SENT = "sent"
+    DELIEVERED = "delievered"
+    READ = "read"
     ACTIVE = "active"
     DELETED = "deleted"
 

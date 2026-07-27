@@ -21,13 +21,13 @@ class ConversationMemberRepository:
 
         return self.session.scalar(statement)
 
-    def get_by_user(self, user_id: int) -> Sequence[ConversationMember]:
+    def get_by_user_id(self, user_id: int) -> Sequence[ConversationMember]:
         statement = select(ConversationMember).where(
             ConversationMember.user_id == user_id
         )
         return self.session.scalars(statement).all()
 
-    def get_by_conversation(self, conversation_id: int) -> Sequence[ConversationMember]:
+    def get_by_conversation_id(self, conversation_id: int) -> Sequence[ConversationMember]:
         statement = select(ConversationMember).where(
             ConversationMember.conversation_id == conversation_id
         )

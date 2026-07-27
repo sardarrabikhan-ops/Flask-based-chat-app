@@ -210,14 +210,34 @@ class UserService:
         if user_id is None:
             return ServiceResult.fail({"user_id": "User ID is required."})
 
-        assert user_id is not None
-
         user = self.repository.get_by_id(user_id)
 
         if user is None:
             return ServiceResult.fail({"user_id": "User not found."})
 
         return ServiceResult.ok(user)
+
+    def search_by_name(
+        self, name: str | None, limit: int | None = None, offset: int | None = None
+    ) -> ServiceResult[Sequence[User]]:
+        """Search the users with the given name"""
+
+        if name is None:
+            return ServiceResult.fail({"name": "name is required."})
+
+        name = " ".join(name.split())
+
+        if not name:
+            return ServiceResult.fail({"name": "name is required."})
+
+        users = self.repository.search_by_name(
+            name, status=UserStatus.ACTIVE, limit=limit, offset=offset
+        )
+
+        if not users:
+            return ServiceResult.fail({"name": "User not found."})
+
+        return ServiceResult.ok(users)
 
     def get_by_email(self, email: str | None) -> ServiceResult[User]:
         """Return the user with the given email"""
@@ -255,38 +275,42 @@ class UserService:
 
         user: User | None = self.repository.get_by_id(user_id)
 
+        if user is None:
+            return ServiceResult.fail({"user_id": "User not found."})
+
         errors: dict[str, str] = {}
 
-        if user is None:
-            errors["user_id"] = "User Not found."
-            return ServiceResult.fail(errors)
-
         if firstname is not None:
+            firstname = firstname.strip()
 
             if error := RegisterValidator.firstname(firstname):
                 errors["firstname"] = error
 
             else:
-                user.firstname = firstname.strip()
+                user.firstname = firstname
 
         if lastname is not None:
+            lastname = lastname.strip()
 
             if error := RegisterValidator.lastname(lastname):
                 errors["lastname"] = error
 
             else:
-                user.lastname = lastname.strip()
+                user.lastname = lastname
 
         if phone_number is not None:
+            phone_number = format_phone_number(phone_number)
 
             if error := RegisterValidator.phone_number(phone_number):
                 errors["phone_number"] = error
 
-            elif self.repository.exists_by_phone_number_except_user(user_id, phone_number):
+            elif self.repository.exists_by_phone_number_except_user(
+                user_id, phone_number
+            ):
                 errors["phone_number"] = "Phone number already exists."
 
             else:
-                user.phone_number = format_phone_number(phone_number)
+                user.phone_number = phone_number
 
         if errors:
             return ServiceResult.fail(errors)
@@ -300,19 +324,22 @@ class UserService:
         new_password: str | None,
         confirm_password: str | None,
     ) -> ServiceResult[User]:
+        """
+        Update the user's password.
+
+        Returns:
+            ServiceResult containing the updated user or validation errors.
+        """
 
         if user_id is None:
             return ServiceResult.fail({"user_id": "User ID is required."})
 
-        assert user_id is not None
-
         user: User | None = self.repository.get_by_id(user_id)
 
-        errors: dict[str, str] = {}
-
         if user is None:
-            errors["user_id"] = "User Not found."
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"user_id": "User not found."})
+
+        errors: dict[str, str] = {}
 
         if error := LoginValidator.password(current_password):
             errors["current_password"] = error
@@ -343,18 +370,17 @@ class UserService:
         user.password = hash_password(new_password)
         return ServiceResult.ok(user)
 
-    def block(self, user_id: int | None) -> ServiceResult[User]:
+    def delete(self, user_id: int | None) -> ServiceResult[User]:
+        """Soft-delete a user by marking its status as DELETED."""
 
         if user_id is None:
             return ServiceResult.fail({"user_id": "User ID is required."})
 
-        user: User | None = self.repository.get_by_id(user_id)
-
-        errors: dict[str, str] = {}
+        user = self.repository.get_by_id(user_id)
 
         if user is None:
-            errors["user_id"] = "User Not found."
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"user_id": "User not found."})
 
-        user.status = UserStatus.BLOCKED
+        user.status = UserStatus.DELETED
+
         return ServiceResult.ok(user)
