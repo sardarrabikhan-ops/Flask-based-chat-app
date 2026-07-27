@@ -17,7 +17,7 @@ class ConversationValidator:
 
         name = name.strip()
 
-        if name is None:
+        if not name:
             return "Conversation name is required."
 
         length = len(name)
@@ -44,7 +44,33 @@ class ConversationValidator:
 
         allowed_values: list[str] = [value.value for value in ConversationType]
 
-        if not conversation_type in allowed_values:
+        if conversation_type not in allowed_values:
             return f"Conversation type must be one of {allowed_values}."
 
         return None
+
+    @classmethod
+    def create(
+        cls,
+        name: str | None,
+        conversation_type: str | None,
+    ) -> dict[str, str]:
+        errors: dict[str, str] = {}
+
+        if error := cls.conversation_type(conversation_type):
+            errors["conversation_type"] = error
+            return errors
+
+        assert conversation_type is not None
+
+        conversation_type_enum = ConversationType(conversation_type.strip())
+
+        if conversation_type_enum == ConversationType.GROUP:
+            if error := cls.name(name):
+                errors["name"] = error
+        else:
+            clean_name = name.strip() if name is not None else ""
+            if clean_name:
+                errors["name"] = "Private conversations cannot have a name."
+
+        return errors

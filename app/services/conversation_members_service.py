@@ -16,9 +16,6 @@ from app.repositories import (
     ConversationRepository,
     UserRepository,
 )
-
-from app.constants import ConversationType
-
 from app.schemas import ServiceResult
 
 
@@ -96,38 +93,26 @@ class ConversationMemberService:
         if membership is None:
             return ServiceResult.fail({"membership": "Membership not found."})
 
-        user = self.user_repository.get_by_id(user_id)
-
-        if user is None:
-            return ServiceResult.fail({"user_id": "User not found."})
-
-        conversation = self.conversation_repository.get_by_id(conversation_id)
-
-        if conversation is None:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
-
-        members = [member for member in conversation.members]
-
-        if not user in members:
-            return ServiceResult.fail(
-                {"membership": "You are not the member of the given ID group."}
-            )
-
         self.repository.delete(membership)
 
         return ServiceResult.ok(membership)
 
-    def get_member(self, user_id: int | None) -> ServiceResult[ConversationMember]:
-        """return the membership of the given user ID."""
+    def get_member(
+        self, user_id: int | None, conversation_id: int | None
+    ) -> ServiceResult[ConversationMember]:
+        """Return the membership for the given user and conversation."""
 
         if user_id is None:
-            return ServiceResult.fail({"user_id": "User not found."})
+            return ServiceResult.fail({"user_id": "User ID is required."})
 
-        membership = self.repository.get_by_user_id(user_id)
+        if conversation_id is None:
+            return ServiceResult.fail(
+                {"conversation_id": "Conversation ID is required."}
+            )
+
+        membership = self.repository.get(user_id, conversation_id)
 
         if membership is None:
-            return ServiceResult.fail(
-                {"membership": "You are not the member of the given ID group."}
-            )
+            return ServiceResult.fail({"membership": "Membership not found."})
 
         return ServiceResult.ok(membership)

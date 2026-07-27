@@ -29,25 +29,18 @@ class ConversationService:
         Returns:
             ServiceResult containing the created conversation or validation errors.
         """
-        errors: dict[str, str] = {}
 
-        if error := ConversationValidator.name(name):
-            errors["name"] = error
-
-        if error := ConversationValidator.conversation_type(conversation_type):
-            errors["conversation_type"] = error
-
-        if errors:
+        if errors := ConversationValidator.create(name, conversation_type):
             return ServiceResult.fail(errors)
 
-        assert name is not None
         assert conversation_type is not None
 
-        name = name.strip()
-        conversation_type = conversation_type.strip()
+        clean_conversation_type = ConversationType(conversation_type.strip())
+
+        clean_name = name.strip() if name is not None else None
 
         conversation = Conversation(
-            name=name, conversation_type=ConversationType(conversation_type)
+            name=clean_name, conversation_type=clean_conversation_type
         )
         conversation = self.repository.create(conversation)
 

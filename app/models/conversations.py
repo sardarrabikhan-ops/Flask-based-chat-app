@@ -32,8 +32,12 @@ class Conversation(Base):
             name="ck_conversations_status_valid",
         ),
         CheckConstraint(
-            "conversation_type = 'private' OR name IS NOT NULL",
-            name="ck_conversations_group_requires_name",
+            f"""
+            (conversation_type = '{ConversationType.PRIVATE.value}' AND name IS NULL)
+            OR
+            (conversation_type = '{ConversationType.GROUP.value}' AND name IS NOT NULL)
+            """,
+            name="ck_conversation_name_matches_type",
         ),
     )
 
