@@ -1,6 +1,6 @@
 # app/repositories/conversations_repo.py
 
-from sqlalchemy import select, or_, case
+from sqlalchemy import select, case
 from sqlalchemy.orm import Session
 
 from app.models import Conversation

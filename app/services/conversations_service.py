@@ -1,9 +1,7 @@
 # app/services/conversations_service.py
 
-from sqlalchemy.orm import Session
-
 from app.models import Conversation
-from app.repositories import ConversationRepository
+from app.services import BaseService
 
 from app.schemas import ServiceResult
 from app.constants import ConversationType, ConversationStatus
@@ -13,12 +11,8 @@ from app.validators import ConversationValidator
 from typing import Sequence
 
 
-class ConversationService:
+class ConversationService(BaseService):
     """Provides conversation-related business logic."""
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
-        self.repository = ConversationRepository(session)
 
     def create(
         self, name: str | None, conversation_type: str | None
@@ -42,7 +36,7 @@ class ConversationService:
         conversation = Conversation(
             name=clean_name, conversation_type=clean_conversation_type
         )
-        conversation = self.repository.create(conversation)
+        conversation = self.conversation_repository.create(conversation)
 
         return ServiceResult.ok(conversation)
 
@@ -54,9 +48,9 @@ class ConversationService:
                 {"conversation_id": "Conversation ID is required."}
             )
 
-        conversation = self.repository.get_by_id(conversation_id)
+        conversation = self.conversation_repository.get_by_id(conversation_id)
 
-        if conversation is None:
+        if conversation is None or conversation.status == ConversationStatus.DELETED:
             return ServiceResult.fail({"conversation_id": "Conversation not found."})
 
         return ServiceResult.ok(conversation)
@@ -79,7 +73,7 @@ class ConversationService:
         if not conversation_name:
             return ServiceResult.fail({"conversation_name": "Conversation name is required."})
 
-        conversations = self.repository.search_by_name(
+        conversations = self.conversation_repository.search_by_name(
             conversation_name,
             status=ConversationStatus.ACTIVE,
             limit=limit,
@@ -106,9 +100,9 @@ class ConversationService:
                 {"conversation_id": "Conversation ID is required."}
             )
 
-        conversation = self.repository.get_by_id(conversation_id)
+        conversation = self.conversation_repository.get_by_id(conversation_id)
 
-        if conversation is None:
+        if conversation is None or conversation.status == ConversationStatus.DELETED:
             return ServiceResult.fail({"conversation_id": "Conversation not found."})
 
         if error := ConversationValidator.name(new_name):
@@ -126,9 +120,9 @@ class ConversationService:
         if conversation_id is None:
             return ServiceResult.fail({"conversation_id": "Conversation ID is required."})
 
-        conversation = self.repository.get_by_id(conversation_id)
+        conversation = self.conversation_repository.get_by_id(conversation_id)
 
-        if conversation is None:
+        if conversation is None or conversation.status == ConversationStatus.DELETED:
             return ServiceResult.fail({"conversation_id": "Conversation not found."})
 
         conversation.status = ConversationStatus.DELETED

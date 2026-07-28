@@ -1,9 +1,7 @@
 # app/services/users_service.py
 
-from sqlalchemy.orm import Session
-
 from app.models import User
-from app.repositories import UserRepository
+from app.services import BaseService
 
 from app.utils import hash_password, format_phone_number, verify_password, format_time
 from app.validators import RegisterValidator, LoginValidator
@@ -20,12 +18,8 @@ from datetime import datetime, UTC
 from typing import Sequence
 
 
-class UserService:
+class UserService(BaseService):
     """Provides user-related business logic."""
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
-        self.repository = UserRepository(self.session)
 
     def register(
         self,
@@ -81,12 +75,12 @@ class UserService:
         if error := RegisterValidator.confirm_password(password, confirm_password):
             errors["confirm_password"] = error
 
-        if self.repository.exists_by_email(email):
+        if self.user_repository.exists_by_email(email):
             errors["email"] = (
                 "An account with this email already exists. Please sign in or use a different email address."
             )
 
-        if self.repository.exists_by_phone_number(phone_number):
+        if self.user_repository.exists_by_phone_number(phone_number):
             errors["phone_number"] = (
                 "An account with this phone number already exists. Please sign in or use a different phone number."
             )
@@ -106,7 +100,7 @@ class UserService:
             password=password,
         )
 
-        user = self.repository.create(user)
+        user = self.user_repository.create(user)
 
         return ServiceResult.ok(user)
 
@@ -137,7 +131,7 @@ class UserService:
         # normalizing fields
         email = email.strip().lower()
 
-        user = self.repository.get_by_email(email)
+        user = self.user_repository.get_by_email(email)
 
         # validating existence
         if user is None:
@@ -197,25 +191,18 @@ class UserService:
     ) -> ServiceResult[Sequence[User]]:
         """Return all users."""
 
-        users = self.repository.get_all(
+        users = self.user_repository.get_all(
             status=status,
             limit=limit,
             offset=offset,
         )
+
         return ServiceResult.ok(users)
 
     def get_by_id(self, user_id: int | None) -> ServiceResult[User]:
         """Return the user with the given ID"""
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
-
-        user = self.repository.get_by_id(user_id)
-
-        if user is None:
-            return ServiceResult.fail({"user_id": "User not found."})
-
-        return ServiceResult.ok(user)
+        return self._require_user(user_id)
 
     def search_by_name(
         self, name: str | None, limit: int | None = None, offset: int | None = None
@@ -230,7 +217,7 @@ class UserService:
         if not name:
             return ServiceResult.fail({"name": "name is required."})
 
-        users = self.repository.search_by_name(
+        users = self.user_repository.search_by_name(
             name, status=UserStatus.ACTIVE, limit=limit, offset=offset
         )
 
@@ -249,7 +236,7 @@ class UserService:
 
         email = email.strip().lower()
 
-        user = self.repository.get_by_email(email)
+        user = self.user_repository.get_by_email(email)
 
         if user is None:
             return ServiceResult.fail({"email": "User not found."})
@@ -270,13 +257,15 @@ class UserService:
             ServiceResult containing the updated user or validation errors.
         """
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+        result = self._require_user(user_id)
 
-        user: User | None = self.repository.get_by_id(user_id)
+        if result.success is False:
+            return result
 
-        if user is None:
-            return ServiceResult.fail({"user_id": "User not found."})
+        assert user_id is not None
+        assert result.data is not None
+
+        user = result.data
 
         errors: dict[str, str] = {}
 
@@ -304,7 +293,7 @@ class UserService:
             if error := RegisterValidator.phone_number(phone_number):
                 errors["phone_number"] = error
 
-            elif self.repository.exists_by_phone_number_except_user(
+            elif self.user_repository.exists_by_phone_number_except_user(
                 user_id, phone_number
             ):
                 errors["phone_number"] = "Phone number already exists."
@@ -331,13 +320,15 @@ class UserService:
             ServiceResult containing the updated user or validation errors.
         """
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+        result = self._require_user(user_id)
 
-        user: User | None = self.repository.get_by_id(user_id)
+        if result.success is False:
+            return result
 
-        if user is None:
-            return ServiceResult.fail({"user_id": "User not found."})
+        assert user_id is not None
+        assert result.data is not None
+
+        user = result.data
 
         errors: dict[str, str] = {}
 
@@ -359,13 +350,11 @@ class UserService:
         if not verify_password(current_password, user.password):
             errors["current_password"] = "Current password is incorrect."
 
-        if verify_password(new_password, user.password):
-            errors["new_password"] = (
-                "New password must be different from the current password."
-            )
-
         if errors:
             return ServiceResult.fail(errors)
+
+        if verify_password(new_password, user.password):
+            return ServiceResult.fail({"new_password": "New password must be different from the current password."})
 
         user.password = hash_password(new_password)
         return ServiceResult.ok(user)
@@ -373,13 +362,15 @@ class UserService:
     def delete(self, user_id: int | None) -> ServiceResult[User]:
         """Soft-delete a user by marking its status as DELETED."""
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+        result = self._require_user(user_id)
 
-        user = self.repository.get_by_id(user_id)
+        if result.success is False:
+            return result
 
-        if user is None:
-            return ServiceResult.fail({"user_id": "User not found."})
+        assert user_id is not None
+        assert result.data is not None
+
+        user = result.data
 
         user.status = UserStatus.DELETED
 

@@ -14,6 +14,7 @@ from app.constants import (
     EMAIL_MAX_LENGTH,
     PASSWORD_MAX_LENGTH,
     PHONE_NUMBER_LENGTH,
+    MAX_LOGIN_ATTEMPTS
 )
 from app.utils import get_enum_values
 
@@ -32,7 +33,7 @@ class User(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "failed_attempts BETWEEN 0 AND 15",
+            f"failed_attempts BETWEEN 0 AND '{MAX_LOGIN_ATTEMPTS}'",
             name="ck_users_failed_attempts_range",
         ),
         CheckConstraint(

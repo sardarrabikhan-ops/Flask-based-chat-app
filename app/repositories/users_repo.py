@@ -2,6 +2,7 @@
 
 from sqlalchemy import select, or_, func, case
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import User
 from app.constants import UserStatus
@@ -22,7 +23,7 @@ class UserRepository:
         status: UserStatus | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        order_by: str | None = None,
+        order_by: ColumnElement | None = None,
     ) -> Sequence[User]:
         statement = select(User)
 

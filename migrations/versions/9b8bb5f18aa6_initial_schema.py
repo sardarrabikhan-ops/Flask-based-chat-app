@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: 63104f36a764
+Revision ID: 9b8bb5f18aa6
 Revises: 
-Create Date: 2026-07-26 21:25:40.472410
+Create Date: 2026-07-28 22:50:53.399009
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '63104f36a764'
+revision: str = '9b8bb5f18aa6'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -27,7 +27,7 @@ def upgrade() -> None:
     sa.Column('conversation_type', sa.Enum('private', 'group', name='conversationtype'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('status', sa.Enum('active', 'deleted', 'archived', name='conversationstatus'), nullable=False),
-    sa.CheckConstraint("conversation_type = 'private' OR name IS NOT NULL", name='ck_conversations_group_requires_name'),
+    sa.CheckConstraint("\n            (conversation_type = 'private' AND name IS NULL)\n            OR\n            (conversation_type = 'group' AND name IS NOT NULL)\n            ", name='ck_conversation_name_matches_type'),
     sa.CheckConstraint("conversation_type IN ('private', 'group')", name='ck_conversations_conversation_type_valid'),
     sa.CheckConstraint("status IN ('active', 'deleted', 'archived')", name='ck_conversations_status_valid'),
     sa.PrimaryKeyConstraint('id')
@@ -42,9 +42,9 @@ def upgrade() -> None:
     sa.Column('failed_attempts', sa.Integer(), nullable=False),
     sa.Column('lock_until', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('status', sa.Enum('active', 'blocked', name='userstatus'), nullable=False),
-    sa.CheckConstraint("status IN ('active', 'blocked')", name='ck_users_status_valid'),
-    sa.CheckConstraint('failed_attempts BETWEEN 0 AND 15', name='ck_users_failed_attempts_range'),
+    sa.Column('status', sa.Enum('active', 'deleted', 'blocked', name='userstatus'), nullable=False),
+    sa.CheckConstraint("failed_attempts BETWEEN 0 AND '20'", name='ck_users_failed_attempts_range'),
+    sa.CheckConstraint("status IN ('active', 'deleted', 'blocked')", name='ck_users_status_valid'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
     sa.UniqueConstraint('phone_number')
@@ -85,11 +85,14 @@ def upgrade() -> None:
     )
     op.create_table('messages',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('sender_id', sa.Integer(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
+    sa.Column('sender_id', sa.Integer(), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('status', sa.Enum('active', 'deleted', name='messagestatus'), nullable=False),
+    sa.Column('delivery_status', sa.Enum('sent', 'delivered', 'read', name='messagedeliverystatus'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.CheckConstraint("delivery_status IN ('sent', 'delivered', 'read')", name='ck_messages_delivery_status_valid'),
     sa.CheckConstraint("status IN ('active', 'deleted')", name='ck_messages_status_valid'),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
     sa.ForeignKeyConstraint(['sender_id'], ['users.id'], ),

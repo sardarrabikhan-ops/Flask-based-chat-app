@@ -2,6 +2,7 @@
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import ConversationMember
 
@@ -21,16 +22,42 @@ class ConversationMemberRepository:
 
         return self.session.scalar(statement)
 
-    def get_by_user_id(self, user_id: int) -> Sequence[ConversationMember]:
+    def get_by_user_id(
+        self,
+        user_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[ConversationMember]:
+
         statement = select(ConversationMember).where(
             ConversationMember.user_id == user_id
         )
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
         return self.session.scalars(statement).all()
 
-    def get_by_conversation_id(self, conversation_id: int) -> Sequence[ConversationMember]:
+    def get_by_conversation_id(
+        self,
+        conversation_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[ConversationMember]:
+
         statement = select(ConversationMember).where(
             ConversationMember.conversation_id == conversation_id
         )
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
         return self.session.scalars(statement).all()
 
     def create(self, conversation_member: ConversationMember) -> ConversationMember:

@@ -33,11 +33,14 @@ class FriendStatus(Enum):
 
 
 class MessageStatus(Enum):
-    SENT = "sent"
-    DELIEVERED = "delievered"
-    READ = "read"
     ACTIVE = "active"
     DELETED = "deleted"
+
+
+class MessageDeliveryStatus(Enum):
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
 
 
 class ConversationMemberRole(Enum):
@@ -58,11 +61,11 @@ PASSWORD_MAX_LENGTH: int = 255
 
 PHONE_NUMBER_LENGTH: int = 16
 
-NAME_ALLOWED_SPECIAL_CHARACTERS: set = {"-", "'", " "}
+NAME_ALLOWED_SPECIAL_CHARACTERS: set[str] = {"-", "'", " "}
 
 PASSWORD_SPECIAL_CHARACTERS: str = "!@#$%&()_><?/"
 
-LOGIN_LOCKS: dict = {
+LOGIN_LOCKS: dict[int, timedelta] = {
     3: timedelta(seconds=30),
     5: timedelta(minutes=5),
     7: timedelta(minutes=15),
