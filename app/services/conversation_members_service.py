@@ -1,12 +1,8 @@
 # app/services/conversation_members_service.py
 
-from sqlalchemy.orm import Session
-
 from app.models import ConversationMember, User, Conversation
 from app.services import BaseService
-
 from app.schemas import ServiceResult
-from app.constants import UserStatus, ConversationStatus
 
 from typing import Sequence
 
@@ -23,26 +19,20 @@ class ConversationMemberService(BaseService):
             ServiceResult containing the added membership or validation errors.
         """
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+        result = self._require_user(user_id)
 
-        if conversation_id is None:
-            return ServiceResult.fail(
-                {"conversation_id": "Conversation ID is required."}
-            )
+        if result.success is False:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
 
-        user = self.user_repository.get_by_id(user_id)
+        result = self._require_conversation(conversation_id)
 
-        if user is None or user.status == UserStatus.DELETED:
-            return ServiceResult.fail({"user_id": "User not found."})
+        if result.success is False:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
 
-        if user.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"user_id": "User is blocked."})
-
-        conversation = self.conversation_repository.get_by_id(conversation_id)
-
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
+        assert user_id is not None
+        assert conversation_id is not None
 
         membership = self.conversation_member_repository.get(user_id, conversation_id)
 
@@ -64,20 +54,7 @@ class ConversationMemberService(BaseService):
     ) -> ServiceResult[ConversationMember]:
         """Return the membership for the given user ID and conversation ID."""
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
-
-        if conversation_id is None:
-            return ServiceResult.fail(
-                {"conversation_id": "Conversation ID is required."}
-            )
-
-        membership = self.conversation_member_repository.get(user_id, conversation_id)
-
-        if membership is None:
-            return ServiceResult.fail({"membership": "Membership not found."})
-
-        return ServiceResult.ok(membership)
+        return self._require_membership(user_id, conversation_id)
 
     def get_members(
         self,
@@ -87,15 +64,13 @@ class ConversationMemberService(BaseService):
     ) -> ServiceResult[Sequence[User]]:
         """Return the members for the given conversation ID."""
 
-        if conversation_id is None:
-            return ServiceResult.fail(
-                {"conversation_id": "Conversation ID is required."}
-            )
+        result = self._require_conversation(conversation_id)
 
-        conversation = self.conversation_repository.get_by_id(conversation_id)
+        if result.success is False:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
 
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
+        assert conversation_id is not None
 
         memberships = self.conversation_member_repository.get_by_conversation_id(
             conversation_id, limit, offset
@@ -113,16 +88,13 @@ class ConversationMemberService(BaseService):
     ) -> ServiceResult[Sequence[Conversation]]:
         """Return the conversations for the given user ID."""
 
-        if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+        result = self._require_user(user_id)
 
-        user = self.user_repository.get_by_id(user_id)
+        if result.success is False:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
 
-        if user is None or user.status == UserStatus.DELETED:
-            return ServiceResult.fail({"user_id": "User not found."})
-
-        if user.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"user_id": "User is blocked."})
+        assert user_id is not None
 
         memberships = self.conversation_member_repository.get_by_user_id(user_id, limit, offset)
 

@@ -18,6 +18,25 @@ class UserRepository:
     def get_by_id(self, user_id: int) -> User | None:
         return self.session.get(User, user_id)
 
+    def get_by_ids(
+        self,
+        ids: list[int],
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[User]:
+
+        statement = select(User).where(
+            User.id.in_(ids), User.status != UserStatus.DELETED
+        )
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        return self.session.scalars(statement).all()
+
     def get_all(
         self,
         status: UserStatus | None = None,
@@ -46,7 +65,11 @@ class UserRepository:
         return self.session.scalar(statement)
 
     def search_by_name(
-        self, name: str, status: UserStatus | None = None, limit: int | None = None, offset: int | None = None
+        self,
+        name: str,
+        status: UserStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> Sequence[User]:
 
         exact = name
@@ -93,11 +116,15 @@ class UserRepository:
         return self.session.scalar(statement)
 
     def exists_by_email(self, email: str) -> bool:
-        statement = select(User).where(User.email == email)
+        statement = select(User).where(
+            User.email == email, User.status != UserStatus.DELETED
+        )
         return self.session.scalar(statement) is not None
 
     def exists_by_phone_number(self, phone_number: str) -> bool:
-        statement = select(User).where(User.phone_number == phone_number)
+        statement = select(User).where(
+            User.phone_number == phone_number, User.status != UserStatus.DELETED
+        )
         return self.session.scalar(statement) is not None
 
     def exists_by_phone_number_except_user(

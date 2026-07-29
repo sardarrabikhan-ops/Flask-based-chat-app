@@ -5,3 +5,4 @@ from app.services.users_service import UserService
 from app.services.conversations_service import ConversationService
 from app.services.conversation_members_service import ConversationMemberService
 from app.services.messages_service import MessageService
+from app.services.friends_service import FriendService

@@ -30,7 +30,7 @@ class MessageRepository:
         statement = select(Message).where(Message.conversation_id == conversation_id)
 
         if status is not None:
-            statement = statement.where(Message.status == MessageStatus.ACTIVE)
+            statement = statement.where(Message.status == status)
 
         if limit is not None:
             statement = statement.limit(limit)

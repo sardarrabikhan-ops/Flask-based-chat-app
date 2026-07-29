@@ -39,24 +39,10 @@ class UserService(BaseService):
 
         errors: dict[str, str] = {}
 
-        # Validation
-        if error := RegisterValidator.firstname(firstname):
-            errors["firstname"] = error
+        validation_errors = self._validate_register_inputs(firstname, lastname, email, phone_number, password)
 
-        if error := RegisterValidator.lastname(lastname):
-            errors["lastname"] = error
-
-        if error := RegisterValidator.email_address(email):
-            errors["email"] = error
-
-        if error := RegisterValidator.phone_number(phone_number):
-            errors["phone_number"] = error
-
-        if error := RegisterValidator.password(password):
-            errors["password"] = error
-
-        if errors:
-            return ServiceResult.fail(errors)
+        if validation_errors:
+            return ServiceResult.fail(validation_errors)
 
         # Tell the type checker these values are no longer None.
         assert firstname is not None
@@ -69,7 +55,7 @@ class UserService(BaseService):
         firstname = firstname.strip()
         lastname = lastname.strip()
         email = email.strip().lower()
-        phone_number = phone_number.strip()
+        phone_number = format_phone_number(phone_number.strip())
 
         # Check uniqueness.
         if error := RegisterValidator.confirm_password(password, confirm_password):
@@ -90,7 +76,6 @@ class UserService(BaseService):
 
         # Format values for storage.
         password = hash_password(password)
-        phone_number = format_phone_number(phone_number)
 
         user = User(
             firstname=firstname,
@@ -135,22 +120,17 @@ class UserService(BaseService):
 
         # validating existence
         if user is None:
-            errors["email"] = "Incorrect email or password."
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"email": "Incorrect email or password."})
 
         # validating status
         if user.status == UserStatus.BLOCKED:
-            errors["account"] = "Your account has been blocked. Please contact support."
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"account": "Your account has been blocked. Please contact support."})
 
         # Verify account lock time.
         current_time = datetime.now(UTC)
         if user.lock_until and current_time < user.lock_until:
             free_time = format_time((user.lock_until - current_time).total_seconds())
-            errors["account"] = (
-                f"Your account is temporarily locked. Please try again after {free_time}."
-            )
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"account": f"Your account is temporarily locked. Please try again after {free_time}."})
 
         # verifying password
         if not verify_password(password, user.password):
@@ -238,8 +218,11 @@ class UserService(BaseService):
 
         user = self.user_repository.get_by_email(email)
 
-        if user is None:
+        if user is None or user.status == UserStatus.DELETED:
             return ServiceResult.fail({"email": "User not found."})
+
+        if user.status == UserStatus.BLOCKED:
+            return ServiceResult.fail({"email": "User is blocked."})
 
         return ServiceResult.ok(user)
 

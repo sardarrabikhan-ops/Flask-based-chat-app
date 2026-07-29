@@ -14,32 +14,48 @@ class FriendRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get(self, user_id: int, friend_id: int) -> Friend | None:
+    def get(
+        self,
+        user_id: int,
+        friend_id: int,
+    ) -> Friend | None:
         statement = select(Friend).where(
             Friend.user_id == user_id, Friend.friend_id == friend_id
         )
         return self.session.scalar(statement)
 
-    def get_active(self, user_id: int, friend_id: int) -> Friend | None:
-        statement = select(Friend).where(
-            Friend.user_id == user_id,
-            Friend.friend_id == friend_id,
-            Friend.status != FriendStatus.REMOVED.value,
-        )
-        return self.session.scalar(statement)
+    def get_by_user_id(
+        self,
+        user_id: int,
+        status: FriendStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[Friend]:
 
-    def get_active_by_user_id(self, user_id: int) -> Sequence[Friend]:
-        statement = select(Friend).where(
-            or_(Friend.user_id == user_id, Friend.friend_id == user_id),
-            Friend.status != FriendStatus.REMOVED.value,
-        )
-        return self.session.scalars(statement).all()
-
-    def get_by_user_id(self, user_id: int) -> Sequence[Friend]:
         statement = select(Friend).where(
             or_(Friend.user_id == user_id, Friend.friend_id == user_id)
         )
+
+        if status is not None:
+            statement = statement.where(Friend.status == status)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
+        statement = statement.order_by(Friend.created_at.desc())
+
         return self.session.scalars(statement).all()
+
+    def exists(self, user_id: int, frien_id: int) -> bool:
+        statement = select(Friend).where(
+            Friend.user_id == user_id,
+            Friend.friend_id == frien_id,
+            Friend.status == FriendStatus.ACTIVE,
+        )
+        return self.session.scalar(statement) is not None
 
     def create(self, friendship: Friend) -> Friend:
         self.session.add(friendship)

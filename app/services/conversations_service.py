@@ -43,17 +43,7 @@ class ConversationService(BaseService):
     def get_by_id(self, conversation_id: int | None) -> ServiceResult[Conversation]:
         """Return the conversation with the given ID"""
 
-        if conversation_id is None:
-            return ServiceResult.fail(
-                {"conversation_id": "Conversation ID is required."}
-            )
-
-        conversation = self.conversation_repository.get_by_id(conversation_id)
-
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
-
-        return ServiceResult.ok(conversation)
+        return self._require_conversation(conversation_id)
 
     def search_by_name(
         self,
@@ -95,15 +85,15 @@ class ConversationService(BaseService):
             ServiceResult containing the updated conversation or validation errors.
         """
 
-        if conversation_id is None:
-            return ServiceResult.fail(
-                {"conversation_id": "Conversation ID is required."}
-            )
+        result = self._require_conversation(conversation_id)
 
-        conversation = self.conversation_repository.get_by_id(conversation_id)
+        if result.success is False:
+            return result
 
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
+        assert conversation_id is not None
+        assert result.data is not None
+
+        conversation = result.data
 
         if error := ConversationValidator.name(new_name):
             return ServiceResult.fail({"name": error})
@@ -115,15 +105,17 @@ class ConversationService(BaseService):
         return ServiceResult.ok(conversation)
 
     def delete(self, conversation_id: int | None) -> ServiceResult[Conversation]:
-        """Soft-delete a user by marking its status as DELETED."""
+        """Soft-delete a conversation by marking its status as DELETED."""
 
-        if conversation_id is None:
-            return ServiceResult.fail({"conversation_id": "Conversation ID is required."})
+        result = self._require_conversation(conversation_id)
 
-        conversation = self.conversation_repository.get_by_id(conversation_id)
+        if result.success is False:
+            return result
 
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
-            return ServiceResult.fail({"conversation_id": "Conversation not found."})
+        assert conversation_id is not None
+        assert result.data is not None
+
+        conversation = result.data
 
         conversation.status = ConversationStatus.DELETED
 
