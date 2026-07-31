@@ -14,7 +14,7 @@ from app.constants import (
     EMAIL_MAX_LENGTH,
     PASSWORD_MAX_LENGTH,
     PHONE_NUMBER_LENGTH,
-    MAX_LOGIN_ATTEMPTS
+    MAX_LOGIN_ATTEMPTS,
 )
 from app.utils import get_enum_values
 
@@ -33,7 +33,7 @@ class User(Base):
 
     __table_args__ = (
         CheckConstraint(
-            f"failed_attempts BETWEEN 0 AND '{MAX_LOGIN_ATTEMPTS}'",
+            f"failed_attempts BETWEEN 0 AND {MAX_LOGIN_ATTEMPTS}",
             name="ck_users_failed_attempts_range",
         ),
         CheckConstraint(
@@ -86,7 +86,7 @@ class User(Base):
     )
 
     conversation_members: Mapped[list["ConversationMember"]] = relationship(
-        "ConversationMember", back_populates="user", cascade="all, delete-orphan"
+        "ConversationMember", back_populates="user"
     )
 
     messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender")
@@ -95,14 +95,12 @@ class User(Base):
         "FriendRequest",
         foreign_keys="FriendRequest.sender_id",
         back_populates="sender",
-        cascade="all, delete-orphan",
     )
 
     received_friend_requests: Mapped[list["FriendRequest"]] = relationship(
         "FriendRequest",
         foreign_keys="FriendRequest.receiver_id",
         back_populates="receiver",
-        cascade="all, delete-orphan",
     )
 
     friendships: Mapped[list["Friend"]] = relationship(

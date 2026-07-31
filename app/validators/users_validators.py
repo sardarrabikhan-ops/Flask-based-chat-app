@@ -4,6 +4,7 @@ from email_validator import validate_email, EmailNotValidError
 import phonenumbers
 from phonenumbers import NumberParseException
 
+from app.validators import BaseValidator
 from app.constants import (
     FIRST_NAME_MIN_LENGTH,
     FIRST_NAME_MAX_LENGTH,
@@ -17,79 +18,36 @@ from app.constants import (
 )
 
 
-class RegisterValidator:
+class RegisterValidator(BaseValidator):
 
     @staticmethod
     def firstname(firstname: str | None) -> str | None:
-        if not firstname:
-            return "First name is required."
-
-        firstname = firstname.strip()
-
-        if not firstname:
-            return "First name is required."
-
-        length = len(firstname)
-
-        if length < FIRST_NAME_MIN_LENGTH:
-            return (
-                f"First name must be at least {FIRST_NAME_MIN_LENGTH} characters long."
-            )
-
-        if length > FIRST_NAME_MAX_LENGTH:
-            return f"First name cannot exceed {FIRST_NAME_MAX_LENGTH} characters."
-
-        if not all(
-            char.isalpha() or char in NAME_ALLOWED_SPECIAL_CHARACTERS
-            for char in firstname
-        ):
-            return (
-                "First name can only contain letters, spaces, apostrophes, and hyphens."
-            )
-
-        return None
+        return RegisterValidator._validate_name(
+            firstname,
+            "First name",
+            FIRST_NAME_MIN_LENGTH,
+            FIRST_NAME_MAX_LENGTH,
+            NAME_ALLOWED_SPECIAL_CHARACTERS,
+        )
 
     @staticmethod
     def lastname(lastname: str | None) -> str | None:
-        if not lastname:
-            return "Last name is required."
-
-        lastname = lastname.strip()
-
-        if not lastname:
-            return "Last name is required."
-
-        length = len(lastname)
-
-        if length < LAST_NAME_MIN_LENGTH:
-            return f"Last name must be at least {LAST_NAME_MIN_LENGTH} characters long."
-
-        if length > LAST_NAME_MAX_LENGTH:
-            return f"Last name cannot exceed {LAST_NAME_MAX_LENGTH} characters."
-
-        if not all(
-            char.isalpha() or char in NAME_ALLOWED_SPECIAL_CHARACTERS
-            for char in lastname
-        ):
-            return (
-                "Last name can only contain letters, spaces, apostrophes, and hyphens."
-            )
-
-        return None
+        return RegisterValidator._validate_name(
+            lastname,
+            "Last name",
+            LAST_NAME_MIN_LENGTH,
+            LAST_NAME_MAX_LENGTH,
+            NAME_ALLOWED_SPECIAL_CHARACTERS,
+        )
 
     @staticmethod
     def email_address(email: str | None) -> str | None:
-        if not email:
-            return "Email is required."
+        if error := RegisterValidator._validate_string(email, "Email"):
+            return error
 
-        email = email.strip()
+        assert email is not None
 
-        if not email:
-            return "Email is required."
-
-        length = len(email)
-
-        if length > EMAIL_MAX_LENGTH:
+        if len(email) > EMAIL_MAX_LENGTH:
             return f"Email address cannot exceed {EMAIL_MAX_LENGTH} characters."
 
         try:
@@ -101,13 +59,10 @@ class RegisterValidator:
 
     @staticmethod
     def phone_number(phone_number: str | None) -> str | None:
-        if not phone_number:
-            return "Phone number is required."
+        if error := RegisterValidator._validate_string(phone_number, "Phone number"):
+            return error
 
-        phone_number = phone_number.strip()
-
-        if not phone_number:
-            return "Phone number is required."
+        assert phone_number is not None
 
         try:
             parsed_number = phonenumbers.parse(phone_number)
@@ -122,13 +77,10 @@ class RegisterValidator:
 
     @staticmethod
     def password(password: str | None) -> str | None:
-        if not password:
-            return "Password is required."
+        if error := RegisterValidator._validate_string(password, "Password"):
+            return error
 
-        password = password.strip()
-
-        if not password:
-            return "Password is required."
+        assert password is not None
 
         length = len(password)
 
@@ -154,13 +106,10 @@ class RegisterValidator:
 
     @staticmethod
     def confirm_password(password: str, confirm_password: str | None) -> str | None:
-        if not confirm_password:
-            return "Please confirm your password."
-
-        confirm_password = confirm_password.strip()
-
-        if not confirm_password:
-            return "Please confirm your password."
+        if error := RegisterValidator._validate_string(
+            confirm_password, "Confirm password"
+        ):
+            return error
 
         if confirm_password != password:
             return "Passwords do not match."
@@ -168,28 +117,12 @@ class RegisterValidator:
         return None
 
 
-class LoginValidator:
+class LoginValidator(BaseValidator):
 
     @staticmethod
     def email_address(email: str | None) -> str | None:
-        if not email:
-            return "Email is required."
-
-        email = email.strip()
-
-        if not email:
-            return "Email is required."
-
-        return None
+        return LoginValidator._validate_string(email, "Email")
 
     @staticmethod
     def password(password: str | None) -> str | None:
-        if not password:
-            return "Password is required."
-
-        password = password.strip()
-
-        if not password:
-            return "Password is required."
-
-        return None
+        return LoginValidator._validate_string(password, "Password")

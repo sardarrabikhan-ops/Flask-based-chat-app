@@ -2,10 +2,11 @@
 
 from sqlalchemy import select, or_, func, case
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.sql import ColumnExpressionArgument
 
 from app.models import User
 from app.constants import UserStatus
+from app.utils import escape_like
 
 from typing import Sequence
 
@@ -42,7 +43,7 @@ class UserRepository:
         status: UserStatus | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        order_by: ColumnElement | None = None,
+        order_by: ColumnExpressionArgument | None = None,
     ) -> Sequence[User]:
         statement = select(User)
 
@@ -60,10 +61,6 @@ class UserRepository:
 
         return self.session.scalars(statement).all()
 
-    def get_by_email(self, email: str) -> User | None:
-        statement = select(User).where(User.email == email)
-        return self.session.scalar(statement)
-
     def search_by_name(
         self,
         name: str,
@@ -71,6 +68,8 @@ class UserRepository:
         limit: int | None = None,
         offset: int | None = None,
     ) -> Sequence[User]:
+
+        name = escape_like(name)
 
         exact = name
         starts = f"{name}%"
@@ -80,12 +79,12 @@ class UserRepository:
         full_name_reverse = func.concat(User.lastname, " ", User.firstname)
 
         rank = case(
-            (full_name.ilike(exact), 0),
-            (full_name.ilike(starts), 1),
-            (full_name.ilike(contains), 2),
-            (full_name_reverse.ilike(exact), 3),
-            (full_name_reverse.ilike(starts), 4),
-            (full_name_reverse.ilike(contains), 5),
+            (full_name.ilike(exact, escape="\\"), 0),
+            (full_name.ilike(starts, escape="\\"), 1),
+            (full_name.ilike(contains, escape="\\"), 2),
+            (full_name_reverse.ilike(exact, escape="\\"), 3),
+            (full_name_reverse.ilike(starts, escape="\\"), 4),
+            (full_name_reverse.ilike(contains, escape="\\"), 5),
             else_=6,
         )
 
@@ -93,11 +92,11 @@ class UserRepository:
             select(User)
             .where(
                 or_(
-                    full_name.ilike(contains),
-                    full_name_reverse.ilike(contains),
+                    full_name.ilike(contains, escape="\\"),
+                    full_name_reverse.ilike(contains, escape="\\"),
                 )
             )
-            .order_by(rank, User.firstname, User.lastname)
+            .order_by(rank, User.firstname, User.lastname, User.id)
         )
 
         if status is not None:
@@ -111,14 +110,27 @@ class UserRepository:
 
         return self.session.scalars(statement).all()
 
+    def get_by_email(self, email: str, deleted: bool = False) -> User | None:
+        statement = select(User).where(
+            User.email == email
+        )
+
+        if not deleted:
+            statement = statement.where(User.status != UserStatus.DELETED)
+
+        return self.session.scalar(statement)
+
     def get_by_phone_number(self, phone_number: str) -> User | None:
-        statement = select(User).where(User.phone_number == phone_number)
+        statement = select(User).where(
+            User.phone_number == phone_number, User.status != UserStatus.DELETED
+        )
         return self.session.scalar(statement)
 
     def exists_by_email(self, email: str) -> bool:
         statement = select(User).where(
             User.email == email, User.status != UserStatus.DELETED
         )
+
         return self.session.scalar(statement) is not None
 
     def exists_by_phone_number(self, phone_number: str) -> bool:
@@ -131,7 +143,9 @@ class UserRepository:
         self, user_id: int, phone_number: str
     ) -> bool:
         statement = select(User).where(
-            User.phone_number == phone_number, User.id != user_id
+            User.phone_number == phone_number,
+            User.id != user_id,
+            User.status != UserStatus.DELETED,
         )
         return self.session.scalar(statement) is not None
 

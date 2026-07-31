@@ -10,12 +10,22 @@ from app.repositories import (
     FriendRepository,
     FriendRequestRepository,
 )
-from app.models import User, Conversation, ConversationMember, Message, Friend
+from app.models import (
+    User,
+    Conversation,
+    ConversationMember,
+    Message,
+    Friend,
+    FriendRequest,
+)
 
-from app.constants import UserStatus, ConversationStatus, MessageStatus, FriendStatus
+from app.constants import UserStatus, MessageStatus, FriendStatus, FriendRequestStatus
 from app.schemas import ServiceResult
 
 from app.validators import RegisterValidator
+from app.utils import hash_password
+
+from typing import Sequence
 
 
 class BaseService:
@@ -55,25 +65,27 @@ class BaseService:
         if error := RegisterValidator.password(password):
             errors["password"] = error
 
-        if errors:
-            return errors
+        return errors
 
-        return {}
-
-    def _require_user(self, user_id: int | None) -> ServiceResult[User]:
+    def _require_existing_user(
+        self, user_id: int | None, field_name: str, entity_name: str
+    ) -> ServiceResult[User]:
 
         if user_id is None:
-            return ServiceResult.fail({"user_id": "User ID is required."})
+            return ServiceResult.fail({field_name: f"{entity_name} ID is required."})
 
-        user: User | None = self.user_repository.get_by_id(user_id)
+        user = self.user_repository.get_by_id(user_id)
 
         if user is None or user.status == UserStatus.DELETED:
-            return ServiceResult.fail({"user_id": "User not found."})
+            return ServiceResult.fail({field_name: f"{entity_name} not found."})
 
         if user.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"user_id": "User is blocked."})
+            return ServiceResult.fail({field_name: f"{entity_name} is blocked."})
 
         return ServiceResult.ok(user)
+
+    def _require_user(self, user_id: int | None) -> ServiceResult[User]:
+        return self._require_existing_user(user_id, "user_id", "User")
 
     def _require_conversation(
         self, conversation_id: int | None
@@ -86,7 +98,7 @@ class BaseService:
 
         conversation = self.conversation_repository.get_by_id(conversation_id)
 
-        if conversation is None or conversation.status == ConversationStatus.DELETED:
+        if conversation is None:
             return ServiceResult.fail({"conversation_id": "Conversation not found."})
 
         return ServiceResult.ok(conversation)
@@ -97,7 +109,7 @@ class BaseService:
 
         user_result = self._require_user(user_id)
 
-        if user_result.success is False:
+        if not user_result.success:
             assert user_result.errors is not None
             return ServiceResult.fail(user_result.errors)
 
@@ -105,13 +117,15 @@ class BaseService:
 
         conversation_result = self._require_conversation(conversation_id)
 
-        if conversation_result.success is False:
+        if not conversation_result.success:
             assert conversation_result.errors is not None
             return ServiceResult.fail(conversation_result.errors)
 
         assert conversation_id is not None
 
-        membership = self.conversation_member_repository.get(user_id, conversation_id)
+        membership = self.conversation_member_repository.get_membership(
+            user_id, conversation_id
+        )
 
         if membership is None:
             return ServiceResult.fail({"membership": "Membership not found."})
@@ -130,21 +144,11 @@ class BaseService:
 
         return ServiceResult.ok(message)
 
-
     def _require_friend(self, friend_id: int | None) -> ServiceResult[User]:
+        return self._require_existing_user(friend_id, "friend_id", "Friend")
 
-        if friend_id is None:
-            return ServiceResult.fail({"friend_id": "Friend ID is required."})
-
-        friend: User | None = self.user_repository.get_by_id(friend_id)
-
-        if friend is None or friend.status == UserStatus.DELETED:
-            return ServiceResult.fail({"friend_id": "Friend not found."})
-
-        if friend.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"friend_id": "Friend is blocked."})
-
-        return ServiceResult.ok(friend)
+    def _require_receiver(self, receiver_id: int | None) -> ServiceResult[User]:
+        return self._require_existing_user(receiver_id, "receiver_id", "Receiver")
 
     def _require_friendship(
         self, user_id: int | None, friend_id: int | None
@@ -152,7 +156,7 @@ class BaseService:
 
         user_result = self._require_user(user_id)
 
-        if user_result.success is False:
+        if not user_result.success:
             assert user_result.errors is not None
             return ServiceResult.fail(user_result.errors)
 
@@ -160,13 +164,11 @@ class BaseService:
 
         friend_result = self._require_friend(friend_id)
 
-        if friend_result.success is False:
+        if not friend_result.success:
             assert friend_result.errors is not None
             return ServiceResult.fail(friend_result.errors)
 
         assert friend_id is not None
-
-        user_id, friend_id = sorted([user_id, friend_id])
 
         friendship = self.friend_repository.get(user_id, friend_id)
 
@@ -174,3 +176,113 @@ class BaseService:
             return ServiceResult.fail({"friendship": "Friendship not found."})
 
         return ServiceResult.ok(friendship)
+
+    def _require_friend_request_between_users(
+        self,
+        sender_id: int | None,
+        receiver_id: int | None,
+        status: FriendRequestStatus | None = None,
+    ) -> ServiceResult[FriendRequest]:
+
+        sender_result = self._require_user(sender_id)
+
+        if not sender_result.success:
+            assert sender_result.errors is not None
+            return ServiceResult.fail(sender_result.errors)
+
+        assert sender_id is not None
+
+        receiver_result = self._require_receiver(receiver_id)
+
+        if not receiver_result.success:
+            assert receiver_result.errors is not None
+            return ServiceResult.fail(receiver_result.errors)
+
+        assert receiver_id is not None
+
+        friend_request = self.friend_request_repository.get_one(
+            sender_id, receiver_id, status
+        )
+
+        if friend_request is None:
+            return ServiceResult.fail({"friend_request": "Friend request not found."})
+
+        return ServiceResult.ok(friend_request)
+
+    def _require_friend_request(
+        self, friend_request_id: int | None
+    ) -> ServiceResult[FriendRequest]:
+
+        if friend_request_id is None:
+            return ServiceResult.fail(
+                {"friend_request_id": "Friend request ID is required."}
+            )
+
+        friend_request: FriendRequest | None = self.friend_request_repository.get_by_id(
+            friend_request_id
+        )
+
+        if friend_request is None:
+            return ServiceResult.fail(
+                {"friend_request_id": "Friend request not found."}
+            )
+
+        return ServiceResult.ok(friend_request)
+
+    def _restore_deleted_user(
+        self,
+        user: User,
+        firstname: str,
+        lastname: str,
+        phone_number: str,
+        password: str,
+    ) -> ServiceResult[User]:
+        user.firstname = firstname
+        user.lastname = lastname
+        user.phone_number = phone_number
+        user.password = hash_password(password)
+
+        user.status = UserStatus.ACTIVE
+        user.failed_attempts = 0
+        user.lock_until = None
+
+        for membership in user.conversation_members:
+            membership.deleted_for_user = False
+
+        for friendship in user.friendships:
+            friendship.status = FriendStatus.REMOVED
+
+        for friendship in user.friendships_as_friend:
+            friendship.status = FriendStatus.REMOVED
+
+        return ServiceResult.ok(user)
+
+    def _change_friend_request_status(
+        self,
+        sender_id: int | None,
+        receiver_id: int | None,
+        status: FriendRequestStatus,
+    ) -> ServiceResult[FriendRequest]:
+
+        friend_request_result = self._require_friend_request_between_users(
+            sender_id, receiver_id, FriendRequestStatus.PENDING
+        )
+
+        if not friend_request_result.success:
+            assert friend_request_result.errors is not None
+            return ServiceResult.fail(friend_request_result.errors)
+
+        assert sender_id is not None
+        assert receiver_id is not None
+        assert friend_request_result.data is not None
+
+        friend_request = friend_request_result.data
+
+        is_friend = self.friend_repository.exists(sender_id, receiver_id)
+
+        if is_friend:
+            return ServiceResult.fail({"friendship": "Friendship already exists."})
+
+        friend_request.status = status
+
+        return ServiceResult.ok(friend_request)

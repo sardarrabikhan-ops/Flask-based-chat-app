@@ -4,7 +4,7 @@ from app.models import Message
 from app.services import BaseService
 
 from app.schemas import ServiceResult
-from app.constants import MessageStatus, MessageDeliveryStatus, ConversationStatus
+from app.constants import MessageStatus, MessageDeliveryStatus
 
 from typing import Sequence
 
@@ -26,18 +26,18 @@ class MessageService(BaseService):
 
         result = self._require_membership(sender_id, conversation_id)
 
-        if result.success is False:
+        if not result.success:
             assert result.errors is not None
             return ServiceResult.fail(result.errors)
 
         assert conversation_id is not None
         assert result.data is not None
 
-        conversation = result.data.conversation
+        membership = result.data
 
-        assert conversation is not None
+        assert membership is not None
 
-        if conversation.status == ConversationStatus.ARCHIVED:
+        if membership.is_archived:
             return ServiceResult.fail({"conversation_id": "User cannot send message to archived conversation."})
 
         message = Message(sender_id=sender_id, conversation_id=conversation_id, content=content.strip())
@@ -63,7 +63,7 @@ class MessageService(BaseService):
 
         result = self._require_membership(user_id, conversation_id)
 
-        if result.success is False:
+        if not result.success:
             assert result.errors is not None
             return ServiceResult.fail(result.errors)
 
@@ -87,7 +87,7 @@ class MessageService(BaseService):
 
         result = self._require_user(user_id)
 
-        if result.success is False:
+        if not result.success:
             assert result.errors is not None
             return ServiceResult.fail(result.errors)
 
@@ -98,7 +98,7 @@ class MessageService(BaseService):
 
         result = self._require_message(message_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert result.data is not None
@@ -121,7 +121,7 @@ class MessageService(BaseService):
 
         result = self._require_user(user_id)
 
-        if result.success is False:
+        if not result.success:
             assert result.errors is not None
             return ServiceResult.fail(result.errors)
 
@@ -132,7 +132,7 @@ class MessageService(BaseService):
 
         result = self._require_message(message_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert result.data is not None
@@ -151,7 +151,7 @@ class MessageService(BaseService):
 
         result = self._require_message(message_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert result.data is not None
@@ -170,7 +170,7 @@ class MessageService(BaseService):
 
         result = self._require_message(message_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert result.data is not None
@@ -179,7 +179,7 @@ class MessageService(BaseService):
 
         result = self._require_membership(user_id, message.conversation_id)
 
-        if result.success is False:
+        if not result.success:
             assert result.errors is not None
             return ServiceResult.fail(result.errors)
 

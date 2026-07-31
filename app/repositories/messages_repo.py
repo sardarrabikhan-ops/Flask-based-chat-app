@@ -3,7 +3,6 @@
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import Message
 from app.constants import MessageStatus
@@ -38,7 +37,7 @@ class MessageRepository:
         if offset is not None:
             statement = statement.offset(offset)
 
-        statement = statement.order_by(Message.created_at)
+        statement = statement.order_by(Message.created_at, Message.id)
 
         return self.session.scalars(statement).all()
 

@@ -14,33 +14,97 @@ class FriendRequestRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get_by_id(self, friend_id: int) -> FriendRequest | None:
-        return self.session.get(FriendRequest, friend_id)
+    def get_by_id(self, friend_request_id: int) -> FriendRequest | None:
+        return self.session.get(FriendRequest, friend_request_id)
 
-    def get_by_sender_id(self, sender_id: int) -> Sequence[FriendRequest]:
-        statement = select(FriendRequest).where(FriendRequest.sender_id == sender_id)
-        return self.session.scalars(statement).all()
-
-    def get_pending_by_sender_id(self, sender_id: int) -> Sequence[FriendRequest]:
+    def get(
+        self,
+        sender_id: int,
+        receiver_id: int,
+        status: FriendRequestStatus | None = None,
+    ) -> Sequence[FriendRequest]:
         statement = select(FriendRequest).where(
             FriendRequest.sender_id == sender_id,
-            FriendRequest.status == FriendRequestStatus.PENDING.value,
+            FriendRequest.receiver_id == receiver_id,
         )
+
+        if status is not None:
+            statement = statement.where(FriendRequest.status == status)
+
         return self.session.scalars(statement).all()
 
-    def get_by_receiver_id(self, receiver_id: int) -> Sequence[FriendRequest]:
+    def get_one(
+        self,
+        sender_id: int,
+        receiver_id: int,
+        status: FriendRequestStatus | None = None,
+    ) -> FriendRequest | None:
+        statement = select(FriendRequest).where(
+            FriendRequest.sender_id == sender_id,
+            FriendRequest.receiver_id == receiver_id,
+        )
+
+        if status is not None:
+            statement = statement.where(FriendRequest.status == status)
+
+        return self.session.scalar(statement)
+
+    def exists(
+        self,
+        sender_id: int,
+        receiver_id: int,
+        status: FriendRequestStatus | None = None,
+    ) -> bool:
+        statement = select(FriendRequest).where(
+            FriendRequest.sender_id == sender_id,
+            FriendRequest.receiver_id == receiver_id,
+        )
+
+        if status is not None:
+            statement = statement.where(FriendRequest.status == status)
+
+        return bool(self.session.scalars(statement).first())
+
+    def get_by_sender_id(
+        self,
+        sender_id: int,
+        status: FriendRequestStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[FriendRequest]:
+        statement = select(FriendRequest).where(FriendRequest.sender_id == sender_id)
+
+        if status is not None:
+            statement = statement.where(FriendRequest.status == status)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
+        return self.session.scalars(statement).all()
+
+    def get_by_receiver_id(
+        self,
+        receiver_id: int,
+        status: FriendRequestStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[FriendRequest]:
         statement = select(FriendRequest).where(
             FriendRequest.receiver_id == receiver_id
         )
-        return self.session.scalars(statement).all()
 
-    def get_pending_by_receiver_id(
-        self, receiver_id: int
-    ) -> Sequence[FriendRequest] | None:
-        statement = select(FriendRequest).where(
-            FriendRequest.receiver_id == receiver_id,
-            FriendRequest.status == FriendRequestStatus.PENDING.value,
-        )
+        if status is not None:
+            statement = statement.where(FriendRequest.status == status)
+
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        if offset is not None:
+            statement = statement.offset(offset)
+
         return self.session.scalars(statement).all()
 
     def create(self, friend_request: FriendRequest) -> FriendRequest | None:

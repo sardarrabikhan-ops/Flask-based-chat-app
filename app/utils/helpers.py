@@ -34,3 +34,12 @@ def format_time(seconds: float) -> str:
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
     return f"{hours} hour(s) {minutes} minute(s) {seconds} second(s)."
+
+
+def escape_like(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def format_set(char_set: set) -> str:
+    lst = list(char_set)
+    return ", ".join(lst[:-1]) + " and " + lst[-1]

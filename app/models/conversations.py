@@ -7,8 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, DateTime, text, CheckConstraint, Enum
 
 from app.database import Base
-from app.constants import ConversationType, ConversationStatus
 from app.utils import get_enum_values
+from app.constants import ConversationType, CONVERSATION_NAME_MAX_LENGTH
 
 if TYPE_CHECKING:
     from app.models.conversation_members import ConversationMember
@@ -19,17 +19,12 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    allowed_status = get_enum_values(ConversationStatus)
     allowed_type = get_enum_values(ConversationType)
 
     __table_args__ = (
         CheckConstraint(
             f"conversation_type IN ({allowed_type})",
             name="ck_conversations_conversation_type_valid",
-        ),
-        CheckConstraint(
-            f"status IN ({allowed_status})",
-            name="ck_conversations_status_valid",
         ),
         CheckConstraint(
             f"""
@@ -42,11 +37,11 @@ class Conversation(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Conversation(id={self.id}, conversation_type={self.conversation_type}, status={self.status}, created_at={self.created_at})"
+        return f"Conversation(id={self.id}, conversation_type={self.conversation_type}, created_at={self.created_at})"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    name: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(CONVERSATION_NAME_MAX_LENGTH), nullable=True)
 
     conversation_type: Mapped[ConversationType] = mapped_column(
         Enum(
@@ -64,22 +59,11 @@ class Conversation(Base):
         nullable=False,
     )
 
-    status: Mapped[ConversationStatus] = mapped_column(
-        Enum(
-            ConversationStatus,
-            values_callable=lambda enum: [e.value for e in enum],
-            name="conversationstatus",
-        ),
-        nullable=False,
-        default=ConversationStatus.ACTIVE,
-    )
-
     members: Mapped[list["ConversationMember"]] = relationship(
         "ConversationMember",
         back_populates="conversation",
-        cascade="all, delete-orphan",
     )
 
     messages: Mapped[list["Message"]] = relationship(
-        "Message", back_populates="conversation", cascade="all, delete-orphan"
+        "Message", back_populates="conversation"
     )

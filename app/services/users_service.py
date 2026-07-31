@@ -8,6 +8,7 @@ from app.validators import RegisterValidator, LoginValidator
 
 from app.constants import (
     UserStatus,
+    FriendStatus,
     LOGIN_LOCKS,
     MAX_LOGIN_ATTEMPTS,
     LOGIN_WARNING_THRESHOLD,
@@ -39,7 +40,9 @@ class UserService(BaseService):
 
         errors: dict[str, str] = {}
 
-        validation_errors = self._validate_register_inputs(firstname, lastname, email, phone_number, password)
+        validation_errors = self._validate_register_inputs(
+            firstname, lastname, email, phone_number, password
+        )
 
         if validation_errors:
             return ServiceResult.fail(validation_errors)
@@ -61,15 +64,25 @@ class UserService(BaseService):
         if error := RegisterValidator.confirm_password(password, confirm_password):
             errors["confirm_password"] = error
 
-        if self.user_repository.exists_by_email(email):
-            errors["email"] = (
-                "An account with this email already exists. Please sign in or use a different email address."
-            )
+        user = self.user_repository.get_by_email(email, deleted=True)
 
-        if self.user_repository.exists_by_phone_number(phone_number):
-            errors["phone_number"] = (
-                "An account with this phone number already exists. Please sign in or use a different phone number."
-            )
+        if user is not None:
+            if user.status != UserStatus.DELETED:
+                errors["email"] = (
+                    "An account with this email already exists. Please sign in or use a different email address."
+                )
+
+            else:
+                self._restore_deleted_user(user, firstname, lastname, phone_number, password)
+                return ServiceResult.ok(user)
+
+        phone_user = self.user_repository.get_by_phone_number(phone_number)
+
+        if phone_user is not None:
+            if user is None or phone_user.id != user.id:
+                errors["phone_number"] = (
+                    "An account with this phone number already exists. Please sign in or use a different phone number."
+                )
 
         if errors:
             return ServiceResult.fail(errors)
@@ -124,36 +137,50 @@ class UserService(BaseService):
 
         # validating status
         if user.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"account": "Your account has been blocked. Please contact support."})
+            return ServiceResult.fail(
+                {"account": "Your account has been blocked. Please contact support."}
+            )
 
         # Verify account lock time.
         current_time = datetime.now(UTC)
         if user.lock_until and current_time < user.lock_until:
             free_time = format_time((user.lock_until - current_time).total_seconds())
-            return ServiceResult.fail({"account": f"Your account is temporarily locked. Please try again after {free_time}."})
+            return ServiceResult.fail(
+                {
+                    "account": f"Your account is temporarily locked. Please try again after {free_time}."
+                }
+            )
 
         # verifying password
         if not verify_password(password, user.password):
 
             user.failed_attempts += 1
 
-            if user.failed_attempts in LOGIN_LOCKS:
-                user.lock_until = current_time + LOGIN_LOCKS[user.failed_attempts]
-                errors["account"] = (
-                    f"Your account is locked for {format_time(LOGIN_LOCKS[user.failed_attempts].total_seconds())}!"
-                )
-
-            elif user.failed_attempts == MAX_LOGIN_ATTEMPTS:
+            if user.failed_attempts >= MAX_LOGIN_ATTEMPTS:
                 user.status = UserStatus.BLOCKED
                 errors["account"] = (
                     "Your account has been blocked. Please contact support."
                 )
 
-            elif user.failed_attempts > LOGIN_WARNING_THRESHOLD:
-                remaining = MAX_LOGIN_ATTEMPTS - user.failed_attempts
-                errors["account"] = (
-                    f"Warning: {remaining} login attempts remaining before your account is blocked."
-                )
+            else:
+
+                lock_duration = None
+                for attempts in sorted(LOGIN_LOCKS.keys(), reverse=True):
+                    if user.failed_attempts >= attempts:
+                        lock_duration = LOGIN_LOCKS[attempts]
+                        break
+
+                if lock_duration is not None:
+                    user.lock_until = current_time + lock_duration
+                    errors["account"] = (
+                        f"Your account is locked for {format_time(LOGIN_LOCKS[user.failed_attempts].total_seconds())}!"
+                    )
+
+                elif user.failed_attempts > LOGIN_WARNING_THRESHOLD:
+                    remaining = MAX_LOGIN_ATTEMPTS - user.failed_attempts
+                    errors["account"] = (
+                        f"Warning: {remaining} login attempts remaining before your account is blocked."
+                    )
 
             errors["email"] = "Incorrect email or password."
             return ServiceResult.fail(errors)
@@ -172,9 +199,7 @@ class UserService(BaseService):
         """Return all users."""
 
         users = self.user_repository.get_all(
-            status=status,
-            limit=limit,
-            offset=offset,
+            status=status, limit=limit, offset=offset, order_by=User.created_at
         )
 
         return ServiceResult.ok(users)
@@ -218,7 +243,7 @@ class UserService(BaseService):
 
         user = self.user_repository.get_by_email(email)
 
-        if user is None or user.status == UserStatus.DELETED:
+        if user is None:
             return ServiceResult.fail({"email": "User not found."})
 
         if user.status == UserStatus.BLOCKED:
@@ -242,7 +267,7 @@ class UserService(BaseService):
 
         result = self._require_user(user_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert user_id is not None
@@ -305,7 +330,7 @@ class UserService(BaseService):
 
         result = self._require_user(user_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert user_id is not None
@@ -337,7 +362,11 @@ class UserService(BaseService):
             return ServiceResult.fail(errors)
 
         if verify_password(new_password, user.password):
-            return ServiceResult.fail({"new_password": "New password must be different from the current password."})
+            return ServiceResult.fail(
+                {
+                    "new_password": "New password must be different from the current password."
+                }
+            )
 
         user.password = hash_password(new_password)
         return ServiceResult.ok(user)
@@ -347,7 +376,7 @@ class UserService(BaseService):
 
         result = self._require_user(user_id)
 
-        if result.success is False:
+        if not result.success:
             return result
 
         assert user_id is not None
@@ -356,5 +385,14 @@ class UserService(BaseService):
         user = result.data
 
         user.status = UserStatus.DELETED
+
+        for membership in user.conversation_members:
+            membership.deleted_for_user = True
+
+        for friendship in user.friendships:
+            friendship.status = FriendStatus.REMOVED
+
+        for friendship in user.friendships_as_friend:
+            friendship.status = FriendStatus.REMOVED
 
         return ServiceResult.ok(user)

@@ -28,25 +28,25 @@ class FriendService(BaseService):
 
         user_result = self._require_user(user_id)
 
-        if user_result.success is False:
+        if not user_result.success:
             assert user_result.errors is not None
             return ServiceResult.fail(user_result.errors)
 
         friend_result = self._require_friend(friend_id)
 
-        if friend_result.success is False:
+        if not friend_result.success:
             assert friend_result.errors is not None
             return ServiceResult.fail(friend_result.errors)
 
         assert user_id is not None
         assert friend_id is not None
 
-        user_id, friend_id = sorted([user_id, friend_id])
-
         if self.friend_repository.exists(user_id, friend_id):
             return ServiceResult.fail(
                 {"friendship": "You cannot make friend who is already your friend."}
             )
+
+        user_id, friend_id = sorted([user_id, friend_id])
 
         friendship = Friend(user_id=user_id, friend_id=friend_id)
 
@@ -61,7 +61,7 @@ class FriendService(BaseService):
 
         friendship_result = self._require_friendship(user_id, friend_id)
 
-        if friendship_result.success is False:
+        if not friendship_result.success:
             return friendship_result
 
         assert friend_id is not None
@@ -78,7 +78,7 @@ class FriendService(BaseService):
 
         friendship_result = self._require_friendship(user_id, friend_id)
 
-        if friendship_result.success is False:
+        if not friendship_result.success:
             return friendship_result
 
         assert friend_id is not None
@@ -95,25 +95,31 @@ class FriendService(BaseService):
 
         user_result = self._require_user(user_id)
 
-        if user_result.success is False:
+        if not user_result.success:
             assert user_result.errors is not None
             return ServiceResult.fail(user_result.errors)
 
         assert user_id is not None
         assert user_result.data is not None
 
-        friendships = self.friend_repository.get_by_user_id(user_id, FriendStatus.ACTIVE, limit, offset)
+        friendships = self.friend_repository.get_by_user_id(
+            user_id, FriendStatus.ACTIVE, limit, offset
+        )
 
         ids = []
 
         for friendship in friendships:
 
-            if friendship.friend.status == UserStatus.ACTIVE:
+            if (
+                friendship.friend.status != UserStatus.ACTIVE
+                or friendship.user.status != UserStatus.ACTIVE
+            ):
+                continue
 
-                if friendship.user_id == user_id:
-                    ids.append(friendship.friend_id)
-                else:
-                    ids.append(friendship.user_id)
+            if friendship.user_id == user_id:
+                ids.append(friendship.friend_id)
+            else:
+                ids.append(friendship.user_id)
 
         friends = self.user_repository.get_by_ids(ids, limit, offset)
 

@@ -15,20 +15,14 @@ class ConversationType(Enum):
     GROUP = "group"
 
 
-class ConversationStatus(Enum):
+class ConversationMemberRole(Enum):
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
+class ConversationMemberStatus(Enum):
     ACTIVE = "active"
-    DELETED = "deleted"
-    ARCHIVED = "archived"
-
-
-class FriendRequestStatus(Enum):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-
-
-class FriendStatus(Enum):
-    ACTIVE = "active"
+    LEFT = "left"
     REMOVED = "removed"
 
 
@@ -43,9 +37,16 @@ class MessageDeliveryStatus(Enum):
     READ = "read"
 
 
-class ConversationMemberRole(Enum):
-    ADMIN = "admin"
-    MEMBER = "member"
+class FriendStatus(Enum):
+    ACTIVE = "active"
+    REMOVED = "removed"
+
+
+class FriendRequestStatus(Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CANCELED = "canceled"
 
 
 FIRST_NAME_MIN_LENGTH: int = 2
@@ -62,6 +63,15 @@ PASSWORD_MAX_LENGTH: int = 255
 PHONE_NUMBER_LENGTH: int = 16
 
 NAME_ALLOWED_SPECIAL_CHARACTERS: set[str] = {"-", "'", " "}
+CONVERSATION_NAME_ALLOWED_SPECIAL_CHARACTERS: set[str] = {
+    "-",
+    "'",
+    "_",
+    ".",
+    "/",
+    ";",
+    ":",
+}
 
 PASSWORD_SPECIAL_CHARACTERS: str = "!@#$%&()_><?/"
 
@@ -80,5 +90,5 @@ LOGIN_WARNING_THRESHOLD = 7
 
 MAX_LOGIN_ATTEMPTS: int = 20
 
-CONVERSATION_NAME_MAX_LENGTH = 30
+CONVERSATION_NAME_MAX_LENGTH = 60
 CONVERSATION_NAME_MIN_LENGTH = 3

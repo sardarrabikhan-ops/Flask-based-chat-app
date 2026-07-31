@@ -20,4 +20,9 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
 
-    DEBUG = bool(os.getenv("DEBUG"))
+    DEBUG = os.getenv("DEBUG", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }

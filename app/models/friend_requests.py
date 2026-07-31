@@ -35,11 +35,6 @@ class FriendRequest(Base):
             "sender_id <> receiver_id",
             name="ck_friend_requests_not_self",
         ),
-        UniqueConstraint(
-            "sender_id",
-            "receiver_id",
-            name="uq_friend_requests_sender_receiver",
-        ),
     )
 
     def __repr__(self) -> str:
@@ -47,13 +42,9 @@ class FriendRequest(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    sender_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
-    receiver_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    receiver_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
