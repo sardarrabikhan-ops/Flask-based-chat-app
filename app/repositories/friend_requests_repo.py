@@ -1,18 +1,15 @@
 # app/repositories/friend_requests_repo.py
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+from app.repositories import BaseRepository
 from app.models import FriendRequest
 from app.constants import FriendRequestStatus
 
 from typing import Sequence
 
 
-class FriendRequestRepository:
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
+class FriendRequestRepository(BaseRepository):
 
     def get_by_id(self, friend_request_id: int) -> FriendRequest | None:
         return self.session.get(FriendRequest, friend_request_id)
@@ -77,11 +74,7 @@ class FriendRequestRepository:
         if status is not None:
             statement = statement.where(FriendRequest.status == status)
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 
@@ -99,11 +92,7 @@ class FriendRequestRepository:
         if status is not None:
             statement = statement.where(FriendRequest.status == status)
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 

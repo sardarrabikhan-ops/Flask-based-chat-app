@@ -247,7 +247,7 @@ class BaseService:
         user.lock_until = None
 
         for membership in user.conversation_members:
-            membership.deleted_for_user = False
+            membership.is_hidden = False
 
         for friendship in user.friendships:
             friendship.status = FriendStatus.REMOVED

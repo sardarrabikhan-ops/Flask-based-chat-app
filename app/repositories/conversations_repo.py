@@ -1,97 +1,71 @@
 # app/repositories/conversations_repo.py
 
-from sqlalchemy import select, case, func, or_
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import select, case, func, union_all
+from sqlalchemy.orm import aliased
 
+from app.repositories import BaseRepository
 from app.models import Conversation, ConversationMember, User, Message
+
 from app.utils import escape_like
 from app.constants import ConversationMemberStatus, ConversationType
 
 from typing import Sequence
 
 
-class ConversationRepository:
+class ConversationRepository(BaseRepository):
 
-    def __init__(self, session: Session) -> None:
-        self.session = session
-
-    def search_groups_by_name(
-        self,
-        user_id: int,
-        conversation_name: str,
-        limit: int | None = None,
-        offset: int | None = None,
+    def search_by_name(
+        self, user_id: int, name: str, limit: int | None, offset: int | None
     ) -> Sequence[Conversation]:
 
-        conversation_name = escape_like(conversation_name)
+        name = escape_like(name)
 
-        exact = conversation_name
-        starts = f"{conversation_name}%"
-        contains = f"%{conversation_name}%"
+        exact = name
+        starts = f"{name}%"
+        contains = f"%{name}%"
 
-        rank = case(
+        my_membership = aliased(ConversationMember)
+        other_membership = aliased(ConversationMember)
+
+        full_name = User.firstname + " " + User.lastname
+
+        private_rank = case(
+            (full_name.ilike(exact, escape="\\"), 0),
+            (full_name.ilike(starts, escape="\\"), 1),
+            (full_name.ilike(contains, escape="\\"), 2),
+            else_=3,
+        )
+
+        group_rank = case(
             (Conversation.name.ilike(exact, escape="\\"), 0),
             (Conversation.name.ilike(starts, escape="\\"), 1),
             (Conversation.name.ilike(contains, escape="\\"), 2),
             else_=3,
         )
 
-        statement = (
-            select(Conversation)
-            .distinct()
-            .join(ConversationMember)
+        group_query = (
+            select(
+                Conversation.id.label("id"),
+                Conversation.name.label("display_name"),
+                group_rank.label("rank"),
+            )
+            .join(ConversationMember, ConversationMember.user_id == user_id)
             .where(
                 ConversationMember.user_id == user_id,
                 Conversation.conversation_type == ConversationType.GROUP,
                 ConversationMember.status == ConversationMemberStatus.ACTIVE,
                 ConversationMember.is_archived.is_(False),
-                ConversationMember.deleted_for_user.is_(False),
+                ConversationMember.is_hidden.is_(False),
                 Conversation.name.ilike(contains, escape="\\"),
             )
-            .order_by(rank, Conversation.name)
         )
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
-
-        return self.session.scalars(statement).all()
-
-    def search_private_by_name(
-        self,
-        user_id: int,
-        name: str,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> Sequence[Conversation]:
-
-        name = escape_like(name)
-
-        my_membership = aliased(ConversationMember)
-        other_membership = aliased(ConversationMember)
-
-        exact = name
-        starts = f"{name}%"
-        contains = f"%{name}%"
-
-        full_name = func.concat(User.firstname, " ", User.lastname)
-        full_name_reverse = func.concat(User.lastname, " ", User.firstname)
-
-        rank = case(
-            (full_name.ilike(exact, escape="\\"), 0),
-            (full_name.ilike(starts, escape="\\"), 1),
-            (full_name.ilike(contains, escape="\\"), 2),
-            (full_name_reverse.ilike(exact, escape="\\"), 3),
-            (full_name_reverse.ilike(starts, escape="\\"), 4),
-            (full_name_reverse.ilike(contains, escape="\\"), 5),
-            else_=6,
-        )
-
-        statement = (
-            select(Conversation)
-            .distinct()
+        private_query = (
+            select(
+                Conversation.id.label("id"),
+                full_name.label("display_name"),
+                private_rank.label("rank"),
+            )
             .join(my_membership, my_membership.conversation_id == Conversation.id)
             .join(other_membership, other_membership.conversation_id == Conversation.id)
             .join(User, User.id == other_membership.user_id)
@@ -99,25 +73,30 @@ class ConversationRepository:
                 my_membership.user_id == user_id,
                 other_membership.user_id != user_id,
                 Conversation.conversation_type == ConversationType.PRIVATE,
-                or_(
-                    full_name.ilike(contains, escape="\\"),
-                    full_name_reverse.ilike(contains, escape="\\"),
-                ),
-            )
-            .where(
                 my_membership.status == ConversationMemberStatus.ACTIVE,
                 other_membership.status == ConversationMemberStatus.ACTIVE,
                 my_membership.is_archived.is_(False),
-                my_membership.deleted_for_user.is_(False),
+                my_membership.is_hidden.is_(False),
+                full_name.ilike(contains, escape="\\"),
             )
-            .order_by(rank, User.firstname, User.lastname, Conversation.id)
         )
 
-        if limit is not None:
-            statement = statement.limit(limit)
+        combined = union_all(group_query, private_query).subquery()
 
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = (
+            select(Conversation)
+            .join(
+                combined,
+                Conversation.id == combined.c.id,
+            )
+            .order_by(
+                combined.c.rank,
+                combined.c.display_name,
+                combined.c.id,
+            )
+        )
+
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 
@@ -144,20 +123,48 @@ class ConversationRepository:
             .where(
                 ConversationMember.user_id == user_id,
                 ConversationMember.status == ConversationMemberStatus.ACTIVE,
-                ConversationMember.deleted_for_user.is_(False),
+                ConversationMember.is_hidden.is_(False),
                 ConversationMember.is_archived.is_(False),
             )
             .group_by(Conversation.id)
-            .order_by(func.max(Message.created_at).desc().nulls_last())
         )
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = self._paginate(
+            statement, limit, offset, func.max(Message.created_at).desc().nulls_last()
+        )
 
         return self.session.scalars(statement).all()
+
+    def get_private_between_users(
+        self, user1_id: int, user2_id: int
+    ) -> Conversation | None:
+
+        cm1 = aliased(ConversationMember)
+        cm2 = aliased(ConversationMember)
+
+        statement = (
+            select(Conversation)
+            .join(
+                cm1,
+                cm1.conversation_id == Conversation.id,
+            )
+            .join(
+                cm2,
+                cm2.conversation_id == Conversation.id,
+            )
+            .where(
+                Conversation.conversation_type == ConversationType.PRIVATE,
+                cm1.user_id == user1_id,
+                cm2.user_id == user2_id,
+                cm1.user_id != cm2.user_id,
+                cm1.status == ConversationMemberStatus.ACTIVE,
+                cm2.status == ConversationMemberStatus.ACTIVE,
+                cm1.is_hidden.is_(False),
+                cm2.is_hidden.is_(False),
+            )
+        )
+
+        return self.session.scalar(statement)
 
     def create(self, conversation: Conversation) -> Conversation:
         self.session.add(conversation)

@@ -1,10 +1,10 @@
 # app/services/messages_service.py
 
-from app.models import Message
+from app.models import Message, Conversation, ConversationMember
 from app.services import BaseService
 
 from app.schemas import ServiceResult
-from app.constants import MessageStatus, MessageDeliveryStatus
+from app.constants import MessageStatus, MessageDeliveryStatus, ConversationMemberRole
 
 from typing import Sequence
 
@@ -12,7 +12,7 @@ from typing import Sequence
 class MessageService(BaseService):
     """Provides message-related business logic."""
 
-    def send(
+    def send_in_group(
         self, sender_id: int | None, conversation_id: int | None, content: str | None
     ) -> ServiceResult[Message]:
         """
@@ -38,9 +38,101 @@ class MessageService(BaseService):
         assert membership is not None
 
         if membership.is_archived:
-            return ServiceResult.fail({"conversation_id": "User cannot send message to archived conversation."})
+            return ServiceResult.fail(
+                {
+                    "conversation_id": "User cannot send message to archived conversation."
+                }
+            )
 
-        message = Message(sender_id=sender_id, conversation_id=conversation_id, content=content.strip())
+        message = Message(
+            sender_id=sender_id,
+            conversation_id=conversation_id,
+            content=content.strip(),
+        )
+
+        message = self.message_repository.create(message)
+
+        return ServiceResult.ok(message)
+
+    def send_private(
+        self, sender_id: int | None, receiver_id: int | None, content: str | None
+    ) -> ServiceResult[Message]:
+        """
+        Send a message to conversation.
+        Returns:
+            Service Result containing the created message.
+        """
+
+        if content is None or not content.strip():
+            return ServiceResult.fail({"content": "Message content is required."})
+
+        result = self._require_user(sender_id)
+
+        if not result.success:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
+
+        assert sender_id is not None
+        assert result.data is not None
+
+        sender = result.data
+
+        result = self._require_receiver(receiver_id)
+
+        if not result.success:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
+
+        assert receiver_id is not None
+        assert result.data is not None
+
+        receiver = result.data
+
+        conversation = self.conversation_repository.get_private_between_users(
+            sender_id, receiver_id
+        )
+
+        if conversation is None:
+            conversation = self.conversation_repository.create(Conversation())
+
+            membership = ConversationMember(
+                user=sender,
+                conversation=conversation,
+                role=ConversationMemberRole.MEMBER,
+            )
+            self.conversation_member_repository.create(membership)
+
+            membership = ConversationMember(
+                user=receiver,
+                conversation=conversation,
+                role=ConversationMemberRole.MEMBER,
+            )
+            self.conversation_member_repository.create(membership)
+
+        result = self._require_membership(sender_id, conversation.id)
+
+        if not result.success:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
+
+        assert result.data is not None
+
+        membership = result.data
+
+        assert membership is not None
+
+        if membership.is_archived:
+            return ServiceResult.fail(
+                {
+                    "conversation_id": "User cannot send message to archived conversation."
+                }
+            )
+
+        message = Message(
+            sender_id=sender_id,
+            conversation_id=conversation.id,
+            content=content.strip(),
+        )
 
         message = self.message_repository.create(message)
 
@@ -116,7 +208,9 @@ class MessageService(BaseService):
 
         return ServiceResult.ok(message)
 
-    def delete(self, user_id: int | None, message_id: int | None) -> ServiceResult[Message]:
+    def delete(
+        self, user_id: int | None, message_id: int | None
+    ) -> ServiceResult[Message]:
         """Soft-delete a message by marking its status as DELETED."""
 
         result = self._require_user(user_id)
@@ -159,13 +253,17 @@ class MessageService(BaseService):
         message = result.data
 
         if message.delivery_status == MessageDeliveryStatus.READ:
-            return ServiceResult.fail({"message": "Message cannot be marked delivered after it is read."})
+            return ServiceResult.fail(
+                {"message": "Message cannot be marked delivered after it is read."}
+            )
 
         message.delivery_status = MessageDeliveryStatus.DELIVERED
 
         return ServiceResult.ok(message)
 
-    def mark_read(self, user_id: int | None, message_id: int | None) -> ServiceResult[Message]:
+    def mark_read(
+        self, user_id: int | None, message_id: int | None
+    ) -> ServiceResult[Message]:
         """Mark the message as read."""
 
         result = self._require_message(message_id)
@@ -186,7 +284,9 @@ class MessageService(BaseService):
         assert user_id is not None
 
         if message.delivery_status == MessageDeliveryStatus.READ:
-            return ServiceResult.fail({"message": "Message cannot be marked read after it is already read."})
+            return ServiceResult.fail(
+                {"message": "Message cannot be marked read after it is already read."}
+            )
 
         message.delivery_status = MessageDeliveryStatus.READ
 

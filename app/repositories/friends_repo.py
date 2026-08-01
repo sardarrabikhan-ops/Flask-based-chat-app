@@ -1,18 +1,15 @@
 # app/repositories/friends_repo.py
 
 from sqlalchemy import select, or_
-from sqlalchemy.orm import Session
 
+from app.repositories import BaseRepository
 from app.models import Friend
 from app.constants import FriendStatus
 
 from typing import Sequence
 
 
-class FriendRepository:
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
+class FriendRepository(BaseRepository):
 
     def get(
         self,
@@ -42,25 +39,22 @@ class FriendRepository:
         if status is not None:
             statement = statement.where(Friend.status == status)
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
-
-        statement = statement.order_by(Friend.created_at.desc())
+        statement = self._paginate(statement, limit, offset, Friend.created_at.desc())
 
         return self.session.scalars(statement).all()
 
-    def exists(self, user_id: int, friend_id: int) -> bool:
+    def exists(self, user_id: int, friend_id: int, deleted: bool = False) -> bool:
 
         user_id, friend_id = sorted([user_id, friend_id])
 
         statement = select(Friend).where(
             Friend.user_id == user_id,
             Friend.friend_id == friend_id,
-            Friend.status == FriendStatus.ACTIVE,
         )
+
+        if not deleted:
+            statement = statement.where(Friend.status != FriendStatus.REMOVED)
+
         return self.session.scalar(statement) is not None
 
     def create(self, friendship: Friend) -> Friend:

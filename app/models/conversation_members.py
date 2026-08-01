@@ -60,7 +60,7 @@ class ConversationMember(Base):
 
     is_archived: Mapped[bool] = mapped_column(nullable=False, default=False)
 
-    deleted_for_user: Mapped[bool] = mapped_column(nullable=False, default=False)
+    is_hidden: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     role: Mapped[ConversationMemberRole] = mapped_column(
         Enum(

@@ -1,28 +1,30 @@
 # app/repositories/conversation_members_repo.py
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+from app.repositories import BaseRepository
 from app.models import ConversationMember
 from app.constants import ConversationMemberStatus
 
 from typing import Sequence
 
 
-class ConversationMemberRepository:
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
+class ConversationMemberRepository(BaseRepository):
 
     def get_membership(
-        self, user_id: int, conversation_id: int
+        self,
+        user_id: int,
+        conversation_id: int,
+        removed: bool = False
     ) -> ConversationMember | None:
         statement = select(ConversationMember).where(
             ConversationMember.user_id == user_id,
             ConversationMember.conversation_id == conversation_id,
-            ConversationMember.status == ConversationMemberStatus.ACTIVE,
-            ConversationMember.deleted_for_user.is_(False),
+            ConversationMember.is_hidden.is_(False),
         )
+
+        if not removed:
+            statement = statement.where(ConversationMember.status != ConversationMemberStatus.REMOVED)
 
         return self.session.scalar(statement)
 
@@ -35,15 +37,11 @@ class ConversationMemberRepository:
 
         statement = select(ConversationMember).where(
             ConversationMember.conversation_id == conversation_id,
-            ConversationMember.deleted_for_user == False,
+            ConversationMember.is_hidden == False,
             ConversationMember.status == ConversationMemberStatus.ACTIVE,
         )
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 

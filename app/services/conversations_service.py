@@ -1,10 +1,13 @@
 # app/services/conversations_service.py
 
-from app.models import Conversation
+from app.models import Conversation, ConversationMember
 from app.services import BaseService
 
 from app.schemas import ServiceResult
-from app.constants import ConversationType
+from app.constants import (
+    ConversationType,
+    ConversationMemberRole,
+)
 
 from app.validators import ConversationValidator
 
@@ -14,9 +17,7 @@ from typing import Sequence
 class ConversationService(BaseService):
     """Provides conversation-related business logic."""
 
-    def create(
-        self, name: str | None, conversation_type: str | None
-    ) -> ServiceResult[Conversation]:
+    def create_group(self, name: str | None) -> ServiceResult[Conversation]:
         """
         Create a new conversation.
 
@@ -24,16 +25,14 @@ class ConversationService(BaseService):
             ServiceResult containing the created conversation or validation errors.
         """
 
-        if errors := ConversationValidator.create(name, conversation_type):
-            return ServiceResult.fail(errors)
+        if error := ConversationValidator.name(name):
+            return ServiceResult.fail({"name": error})
 
-        assert conversation_type is not None
-
-        clean_conversation_type = ConversationType(conversation_type.strip())
-        clean_name = name.strip() if name is not None else None
+        assert name is not None
 
         conversation = Conversation(
-            name=clean_name, conversation_type=clean_conversation_type
+            name=name.strip(),
+            conversation_type=ConversationType.GROUP,
         )
 
         conversation = self.conversation_repository.create(conversation)
@@ -74,26 +73,14 @@ class ConversationService(BaseService):
 
         assert user_id is not None
 
-        group_conversations = self.conversation_repository.search_groups_by_name(
-            user_id,
-            conversation_name,
-            limit=limit,
-            offset=offset,
+        conversations = self.conversation_repository.search_by_name(
+            user_id, conversation_name, limit, offset
         )
-
-        private_conversations = self.conversation_repository.search_private_by_name(
-            user_id,
-            conversation_name,
-            limit=limit,
-            offset=offset,
-        )
-
-        conversations = [*group_conversations, *private_conversations]
 
         return ServiceResult.ok(conversations)
 
     def rename(
-        self, conversation_id: int | None, new_name: str | None
+        self, actor_id: int | None, conversation_id: int | None, new_name: str | None
     ) -> ServiceResult[Conversation]:
         """
         Rename a conversation.
@@ -116,6 +103,19 @@ class ConversationService(BaseService):
             return ServiceResult.fail(
                 {"conversation": "Private conversations cannot have a name."}
             )
+
+        actor_membership_result = self._require_membership(actor_id, conversation_id)
+
+        if not actor_membership_result.success:
+            assert actor_membership_result.errors is not None
+            return ServiceResult.fail(actor_membership_result.errors)
+
+        assert actor_membership_result.data is not None
+
+        actor_membership = actor_membership_result.data
+
+        if actor_membership.role != ConversationMemberRole.ADMIN:
+            return ServiceResult.fail({"user": "Only administrators can rename conversation."})
 
         if error := ConversationValidator.name(new_name):
             return ServiceResult.fail({"name": error})
@@ -147,3 +147,39 @@ class ConversationService(BaseService):
         )
 
         return ServiceResult.ok(conversations)
+
+    def archive(
+        self, conversation_id: int | None, user_id: int | None
+    ) -> ServiceResult[ConversationMember]:
+        """Archive the membership of the given ID's."""
+
+        result = self._require_membership(user_id, conversation_id)
+
+        if not result.success:
+            return result
+
+        assert result.data is not None
+
+        membership = result.data
+
+        membership.is_archived = True
+
+        return ServiceResult.ok(membership)
+
+    def delete(
+        self, conversation_id: int | None, user_id: int | None
+    ) -> ServiceResult[ConversationMember]:
+        """Soft-delete the membership of the given ID's."""
+
+        result = self._require_membership(user_id, conversation_id)
+
+        if not result.success:
+            return result
+
+        assert result.data is not None
+
+        membership = result.data
+
+        membership.is_hidden = True
+
+        return ServiceResult.ok(membership)

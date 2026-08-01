@@ -1,20 +1,18 @@
 # app/repositories/users_repo.py
 
-from sqlalchemy import select, or_, func, case
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import ColumnExpressionArgument
+from sqlalchemy import select, func, case
+from sqlalchemy.sql import ColumnElement
 
+from app.repositories import BaseRepository
 from app.models import User
+
 from app.constants import UserStatus
 from app.utils import escape_like
 
 from typing import Sequence
 
 
-class UserRepository:
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
+class UserRepository(BaseRepository):
 
     def get_by_id(self, user_id: int) -> User | None:
         return self.session.get(User, user_id)
@@ -30,11 +28,7 @@ class UserRepository:
             User.id.in_(ids), User.status != UserStatus.DELETED
         )
 
-        if offset is not None:
-            statement = statement.offset(offset)
-
-        if limit is not None:
-            statement = statement.limit(limit)
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 
@@ -43,21 +37,14 @@ class UserRepository:
         status: UserStatus | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        order_by: ColumnExpressionArgument | None = None,
+        order_by: ColumnElement | None = None,
     ) -> Sequence[User]:
         statement = select(User)
 
         if status is not None:
             statement = statement.where(User.status == status)
 
-        if offset is not None:
-            statement = statement.offset(offset)
-
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if order_by is not None:
-            statement = statement.order_by(order_by)
+        statement = self._paginate(statement, limit, offset, order_by)
 
         return self.session.scalars(statement).all()
 
@@ -76,44 +63,29 @@ class UserRepository:
         contains = f"%{name}%"
 
         full_name = func.concat(User.firstname, " ", User.lastname)
-        full_name_reverse = func.concat(User.lastname, " ", User.firstname)
 
         rank = case(
             (full_name.ilike(exact, escape="\\"), 0),
             (full_name.ilike(starts, escape="\\"), 1),
             (full_name.ilike(contains, escape="\\"), 2),
-            (full_name_reverse.ilike(exact, escape="\\"), 3),
-            (full_name_reverse.ilike(starts, escape="\\"), 4),
-            (full_name_reverse.ilike(contains, escape="\\"), 5),
-            else_=6,
+            else_=3,
         )
 
         statement = (
             select(User)
-            .where(
-                or_(
-                    full_name.ilike(contains, escape="\\"),
-                    full_name_reverse.ilike(contains, escape="\\"),
-                )
-            )
+            .where(full_name.ilike(contains, escape="\\"))
             .order_by(rank, User.firstname, User.lastname, User.id)
         )
 
         if status is not None:
             statement = statement.where(User.status == status)
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
+        statement = self._paginate(statement, limit, offset)
 
         return self.session.scalars(statement).all()
 
     def get_by_email(self, email: str, deleted: bool = False) -> User | None:
-        statement = select(User).where(
-            User.email == email
-        )
+        statement = select(User).where(User.email == email)
 
         if not deleted:
             statement = statement.where(User.status != UserStatus.DELETED)

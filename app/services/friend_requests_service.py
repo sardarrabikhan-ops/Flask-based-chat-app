@@ -65,7 +65,9 @@ class FriendRequestService(BaseService):
     ) -> ServiceResult[FriendRequest]:
         """Accept the friend request by marking it's status as ACCEPTED."""
 
-        result = self._change_friend_request_status(sender_id, receiver_id, FriendRequestStatus.ACCEPTED)
+        result = self._change_friend_request_status(
+            sender_id, receiver_id, FriendRequestStatus.ACCEPTED
+        )
 
         if not result.success:
             assert result.errors is not None
@@ -89,7 +91,9 @@ class FriendRequestService(BaseService):
     ) -> ServiceResult[FriendRequest]:
         """Reject the friend request by marking it's status as REJECTED."""
 
-        result = self._change_friend_request_status(sender_id, receiver_id, FriendRequestStatus.REJECTED)
+        result = self._change_friend_request_status(
+            sender_id, receiver_id, FriendRequestStatus.REJECTED
+        )
 
         if not result.success:
             assert result.errors is not None
@@ -106,7 +110,9 @@ class FriendRequestService(BaseService):
     ) -> ServiceResult[FriendRequest]:
         """Cancel the friend request by marking it's status as CANCELED."""
 
-        result = self._change_friend_request_status(sender_id, receiver_id, FriendRequestStatus.CANCELED)
+        result = self._change_friend_request_status(
+            sender_id, receiver_id, FriendRequestStatus.CANCELED
+        )
 
         if not result.success:
             assert result.errors is not None

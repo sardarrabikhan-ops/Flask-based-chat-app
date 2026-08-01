@@ -41,35 +41,21 @@ class FriendService(BaseService):
         assert user_id is not None
         assert friend_id is not None
 
-        if self.friend_repository.exists(user_id, friend_id):
-            return ServiceResult.fail(
-                {"friendship": "You cannot make friend who is already your friend."}
-            )
+        friendship = self.friend_repository.get(user_id, friend_id)
+
+        if friendship is not None:
+            if friendship.status == FriendStatus.ACTIVE:
+                return ServiceResult.fail(
+                    {"friendship": "You cannot make friend who is already your friend."}
+                )
+            else:
+                friendship.status = FriendStatus.ACTIVE
 
         user_id, friend_id = sorted([user_id, friend_id])
 
         friendship = Friend(user_id=user_id, friend_id=friend_id)
 
         friendship = self.friend_repository.create(friendship)
-
-        return ServiceResult.ok(friendship)
-
-    def delete(
-        self, user_id: int | None, friend_id: int | None
-    ) -> ServiceResult[Friend]:
-        """Soft-delete a friend by marking its status as REMOVED."""
-
-        friendship_result = self._require_friendship(user_id, friend_id)
-
-        if not friendship_result.success:
-            return friendship_result
-
-        assert friend_id is not None
-        assert friendship_result.data is not None
-
-        friendship = friendship_result.data
-
-        friendship.status = FriendStatus.REMOVED
 
         return ServiceResult.ok(friendship)
 
@@ -127,6 +113,24 @@ class FriendService(BaseService):
             return ServiceResult.fail({"friends": "Friends not found."})
 
         return ServiceResult.ok(friends)
+
+    def delete(
+        self, user_id: int | None, friend_id: int | None
+    ) -> ServiceResult[Friend]:
+        """Soft-delete a friend by marking its status as REMOVED."""
+
+        friendship_result = self._require_friendship(user_id, friend_id)
+
+        if not friendship_result.success:
+            return friendship_result
+
+        assert friendship_result.data is not None
+
+        friendship = friendship_result.data
+
+        friendship.status = FriendStatus.REMOVED
+
+        return ServiceResult.ok(friendship)
 
     def are_friends(self, user_id: int | None, friend_id: int | None) -> bool:
 

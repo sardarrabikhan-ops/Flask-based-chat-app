@@ -1,19 +1,15 @@
 # app/repositories/messages_repo.py
 
-
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+from app.repositories import BaseRepository
 from app.models import Message
 from app.constants import MessageStatus
 
 from typing import Sequence
 
 
-class MessageRepository:
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
+class MessageRepository(BaseRepository):
 
     def get_by_id(self, message_id: int) -> Message | None:
         return self.session.get(Message, message_id)
@@ -31,13 +27,9 @@ class MessageRepository:
         if status is not None:
             statement = statement.where(Message.status == status)
 
-        if limit is not None:
-            statement = statement.limit(limit)
-
-        if offset is not None:
-            statement = statement.offset(offset)
-
-        statement = statement.order_by(Message.created_at, Message.id)
+        statement = self._paginate(statement, limit, offset).order_by(
+            Message.created_at, Message.id
+        )
 
         return self.session.scalars(statement).all()
 
