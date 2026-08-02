@@ -286,3 +286,30 @@ class BaseService:
         friend_request.status = status
 
         return ServiceResult.ok(friend_request)
+
+    def _create_friendship(self, user_id: int, friend_id: int) -> ServiceResult[Friend]:
+
+        if user_id == friend_id:
+            return ServiceResult.fail(
+                {"friendship": "You cannot make yourself friend."}
+            )
+
+        friendship = self.friend_repository.get(user_id, friend_id)
+
+        if friendship is not None:
+
+            if friendship.status == FriendStatus.ACTIVE:
+                return ServiceResult.fail(
+                    {"friendship": "You cannot make friend who is already your friend."}
+                )
+
+            friendship.status = FriendStatus.ACTIVE
+            return ServiceResult.ok(friendship)
+
+        user_id, friend_id = sorted([user_id, friend_id])
+
+        friendship = Friend(user_id=user_id, friend_id=friend_id)
+
+        friendship = self.friend_repository.create(friendship)
+
+        return ServiceResult.ok(friendship)

@@ -159,8 +159,6 @@ class ConversationRepository(BaseRepository):
                 cm1.user_id != cm2.user_id,
                 cm1.status == ConversationMemberStatus.ACTIVE,
                 cm2.status == ConversationMemberStatus.ACTIVE,
-                cm1.is_hidden.is_(False),
-                cm2.is_hidden.is_(False),
             )
         )
 

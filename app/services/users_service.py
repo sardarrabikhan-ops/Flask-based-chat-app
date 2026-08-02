@@ -108,34 +108,37 @@ class UserService(BaseService):
             if error := RegisterValidator.firstname(firstname):
                 errors["firstname"] = error
 
-            else:
-                user.firstname = firstname
-
         if lastname is not None:
             lastname = lastname.strip()
 
             if error := RegisterValidator.lastname(lastname):
                 errors["lastname"] = error
 
-            else:
-                user.lastname = lastname
-
         if phone_number is not None:
-            phone_number = format_phone_number(phone_number)
+            phone_number = format_phone_number(phone_number.strip())
 
             if error := RegisterValidator.phone_number(phone_number):
                 errors["phone_number"] = error
 
-            elif self.user_repository.exists_by_phone_number_except_user(
-                user_id, phone_number
+            elif (
+                user.phone_number != phone_number
+                and self.user_repository.exists_by_phone_number_except_user(
+                    user_id, phone_number
+                )
             ):
                 errors["phone_number"] = "Phone number already exists."
 
-            else:
-                user.phone_number = phone_number
-
         if errors:
             return ServiceResult.fail(errors)
+
+        if firstname is not None and user.firstname != firstname:
+            user.firstname = firstname
+
+        if lastname is not None and user.lastname != lastname:
+            user.lastname = lastname
+
+        if phone_number is not None and user.phone_number != phone_number:
+            user.phone_number = phone_number
 
         return ServiceResult.ok(user)
 

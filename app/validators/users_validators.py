@@ -68,10 +68,10 @@ class RegisterValidator(BaseValidator):
             parsed_number = phonenumbers.parse(phone_number)
 
             if not phonenumbers.is_valid_number(parsed_number):
-                return "Please enter a valid phone number."
+                return "Please enter a valid phone number in international format (e.g. +92XXXXXXXXXX)."
 
         except NumberParseException:
-            return "Please enter a valid phone number."
+            return "Please enter a valid phone number in international format (e.g. +92XXXXXXXXXX)."
 
         return None
 

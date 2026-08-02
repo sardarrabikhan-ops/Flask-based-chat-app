@@ -30,6 +30,8 @@ class BaseValidator:
 
         assert name is not None
 
+        name = name.strip()
+
         length = len(name)
 
         if length < min_length:
@@ -47,6 +49,10 @@ class BaseValidator:
     def _validate_enum(string: str | None, field: str, enums: type[Enum]) -> str | None:
         if error := BaseValidator._validate_string(string, field):
             return error
+
+        assert string is not None
+
+        string = string.strip()
 
         allowed_values: list[str] = [value.value for value in enums]
 

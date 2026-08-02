@@ -4,7 +4,12 @@ from app.models import Message, Conversation, ConversationMember
 from app.services import BaseService
 
 from app.schemas import ServiceResult
-from app.constants import MessageStatus, MessageDeliveryStatus, ConversationMemberRole
+from app.constants import (
+    MessageStatus,
+    MessageDeliveryStatus,
+    ConversationMemberRole,
+    MESSAGE_MAX_LENGTH,
+)
 
 from typing import Sequence
 
@@ -23,6 +28,13 @@ class MessageService(BaseService):
 
         if content is None or not content.strip():
             return ServiceResult.fail({"content": "Message content is required."})
+
+        assert content is not None
+
+        if len(content) > MESSAGE_MAX_LENGTH:
+            return ServiceResult.fail(
+                {"content": f"Message must not exceed {MESSAGE_MAX_LENGTH} characters."}
+            )
 
         result = self._require_membership(sender_id, conversation_id)
 
@@ -55,7 +67,10 @@ class MessageService(BaseService):
         return ServiceResult.ok(message)
 
     def send_private(
-        self, sender_id: int | None, receiver_id: int | None, content: str | None
+        self,
+        sender_id: int | None,
+        receiver_id: int | None,
+        content: str | None,
     ) -> ServiceResult[Message]:
         """
         Send a message to conversation.
@@ -65,6 +80,13 @@ class MessageService(BaseService):
 
         if content is None or not content.strip():
             return ServiceResult.fail({"content": "Message content is required."})
+
+        assert content is not None
+
+        if len(content) > MESSAGE_MAX_LENGTH:
+            return ServiceResult.fail(
+                {"content": f"Message must not exceed {MESSAGE_MAX_LENGTH} characters."}
+            )
 
         result = self._require_user(sender_id)
 
@@ -128,6 +150,17 @@ class MessageService(BaseService):
                 }
             )
 
+        receiver_membership = self.conversation_member_repository.get_membership(
+            receiver_id,
+            conversation.id,
+            removed=True,
+        )
+
+        assert receiver_membership is not None, "Receiver membership should always exist."
+
+        membership.is_hidden = False
+        receiver_membership.is_hidden = False
+
         message = Message(
             sender_id=sender_id,
             conversation_id=conversation.id,
@@ -147,7 +180,7 @@ class MessageService(BaseService):
         self,
         user_id: int | None,
         conversation_id: int | None,
-        status: MessageStatus | None = None,
+        status: MessageStatus | None = MessageStatus.ACTIVE,
         limit: int | None = None,
         offset: int | None = None,
     ) -> ServiceResult[Sequence[Message]]:
@@ -164,11 +197,6 @@ class MessageService(BaseService):
         messages = self.message_repository.get_by_conversation_id(
             conversation_id, status, limit, offset
         )
-
-        if not messages:
-            return ServiceResult.fail(
-                {"message": "This conversation doesn't contain messages."}
-            )
 
         return ServiceResult.ok(messages)
 
@@ -202,6 +230,13 @@ class MessageService(BaseService):
 
         if content is None or not content.strip():
             return ServiceResult.fail({"content": "Content is required."})
+
+        assert content is not None
+
+        if len(content) > MESSAGE_MAX_LENGTH:
+            return ServiceResult.fail(
+                {"content": f"Message must not exceed {MESSAGE_MAX_LENGTH} characters."}
+            )
 
         if message.content != content.strip():
             message.content = content.strip()
@@ -240,7 +275,9 @@ class MessageService(BaseService):
 
         return ServiceResult.ok(message)
 
-    def mark_delivered(self, message_id: int | None) -> ServiceResult[Message]:
+    def mark_delivered(
+        self, user_id: int | None, message_id: int | None
+    ) -> ServiceResult[Message]:
         """Mark the message as delivered."""
 
         result = self._require_message(message_id)
@@ -251,6 +288,14 @@ class MessageService(BaseService):
         assert result.data is not None
 
         message = result.data
+
+        result = self._require_membership(user_id, message.conversation_id)
+
+        if not result.success:
+            assert result.errors is not None
+            return ServiceResult.fail(result.errors)
+
+        assert user_id is not None
 
         if message.delivery_status == MessageDeliveryStatus.READ:
             return ServiceResult.fail(

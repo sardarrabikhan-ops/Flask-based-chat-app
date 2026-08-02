@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: a3c4b8309039
+Revision ID: 6d240b8a669f
 Revises: 
-Create Date: 2026-07-31 21:36:53.381612
+Create Date: 2026-08-02 20:40:03.290060
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a3c4b8309039'
+revision: str = '6d240b8a669f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -53,7 +53,7 @@ def upgrade() -> None:
     sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('status', sa.Enum('active', 'left', 'removed', name='conversationmemberstatus'), nullable=False),
     sa.Column('is_archived', sa.Boolean(), nullable=False),
-    sa.Column('deleted_for_user', sa.Boolean(), nullable=False),
+    sa.Column('is_hidden', sa.Boolean(), nullable=False),
     sa.Column('role', sa.Enum('admin', 'member', name='conversationmemberrole'), nullable=False),
     sa.CheckConstraint("role IN ('admin', 'member')", name='ck_conversation_members_role_valid'),
     sa.CheckConstraint("status IN ('active', 'left', 'removed')", name='ck_conversation_members_status_valid'),
@@ -88,7 +88,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
     sa.Column('sender_id', sa.Integer(), nullable=False),
-    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('content', sa.String(length=10000), nullable=False),
     sa.Column('status', sa.Enum('active', 'deleted', name='messagestatus'), nullable=False),
     sa.Column('delivery_status', sa.Enum('sent', 'delivered', 'read', name='messagedeliverystatus'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),

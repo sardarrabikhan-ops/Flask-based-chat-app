@@ -12,19 +12,18 @@ from typing import Sequence
 class ConversationMemberRepository(BaseRepository):
 
     def get_membership(
-        self,
-        user_id: int,
-        conversation_id: int,
-        removed: bool = False
+        self, user_id: int, conversation_id: int, removed: bool = False
     ) -> ConversationMember | None:
         statement = select(ConversationMember).where(
             ConversationMember.user_id == user_id,
             ConversationMember.conversation_id == conversation_id,
-            ConversationMember.is_hidden.is_(False),
         )
 
         if not removed:
-            statement = statement.where(ConversationMember.status != ConversationMemberStatus.REMOVED)
+            statement = statement.where(
+                ConversationMember.status != ConversationMemberStatus.REMOVED,
+                ConversationMember.is_hidden.is_(False),
+            )
 
         return self.session.scalar(statement)
 
@@ -37,7 +36,7 @@ class ConversationMemberRepository(BaseRepository):
 
         statement = select(ConversationMember).where(
             ConversationMember.conversation_id == conversation_id,
-            ConversationMember.is_hidden == False,
+            ConversationMember.is_hidden.is_(False),
             ConversationMember.status == ConversationMemberStatus.ACTIVE,
         )
 

@@ -11,7 +11,6 @@ from app.constants import (
     UserStatus,
     LOGIN_LOCKS,
     MAX_LOGIN_ATTEMPTS,
-    LOGIN_WARNING_THRESHOLD,
 )
 
 from datetime import UTC, datetime
@@ -173,12 +172,6 @@ class AuthenticationService(BaseService):
                     user.lock_until = current_time + lock_duration
                     errors["account"] = (
                         f"Your account is locked for {format_time(lock_duration.total_seconds())}!"
-                    )
-
-                elif user.failed_attempts > LOGIN_WARNING_THRESHOLD:
-                    remaining = MAX_LOGIN_ATTEMPTS - user.failed_attempts
-                    errors["account"] = (
-                        f"Warning: {remaining} login attempts remaining before your account is blocked."
                     )
 
             errors["email"] = "Incorrect email or password."

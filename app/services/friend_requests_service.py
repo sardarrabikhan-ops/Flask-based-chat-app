@@ -1,6 +1,6 @@
 # app/services/friend_requests_service.py
 
-from app.models import FriendRequest, Friend
+from app.models import FriendRequest
 from app.services import BaseService
 
 from app.schemas import ServiceResult
@@ -79,10 +79,7 @@ class FriendRequestService(BaseService):
 
         friend_request = result.data
 
-        user_id, friend_id = sorted([sender_id, receiver_id])
-
-        friend = Friend(user_id=user_id, friend_id=friend_id)
-        friend = self.friend_repository.create(friend)
+        self._create_friendship(sender_id, receiver_id)
 
         return ServiceResult.ok(friend_request)
 

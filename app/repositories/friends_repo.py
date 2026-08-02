@@ -1,10 +1,11 @@
 # app/repositories/friends_repo.py
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import aliased, selectinload
 
 from app.repositories import BaseRepository
-from app.models import Friend
-from app.constants import FriendStatus
+from app.models import Friend, User
+from app.constants import FriendStatus, UserStatus
 
 from typing import Sequence
 
@@ -30,14 +31,36 @@ class FriendRepository(BaseRepository):
         status: FriendStatus | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        member_status: UserStatus | None = None,
     ) -> Sequence[Friend]:
 
-        statement = select(Friend).where(
-            or_(Friend.user_id == user_id, Friend.friend_id == user_id)
+        user = aliased(User)
+        friend = aliased(User)
+
+        statement = (
+            select(Friend)
+            .options(
+                selectinload(Friend.user),
+                selectinload(Friend.friend),
+            )
+            .join(user, Friend.user)
+            .join(friend, Friend.friend)
+            .where(
+                or_(
+                    Friend.user_id == user_id,
+                    Friend.friend_id == user_id,
+                ),
+            )
         )
 
         if status is not None:
             statement = statement.where(Friend.status == status)
+
+        if member_status is not None:
+            statement = statement.where(
+                user.status == member_status,
+                friend.status == member_status,
+            )
 
         statement = self._paginate(statement, limit, offset, Friend.created_at.desc())
 

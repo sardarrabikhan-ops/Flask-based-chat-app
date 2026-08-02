@@ -35,6 +35,10 @@ class ConversationMemberService(BaseService):
         if error := ConversationMemberValidator.user_role(role):
             return ServiceResult.fail({"role": error})
 
+        assert role is not None
+
+        clean_role = ConversationMemberRole(role.strip())
+
         result = self._require_user(user_id)
 
         if not result.success:
@@ -54,26 +58,9 @@ class ConversationMemberService(BaseService):
 
         conversation = result.data
 
-        membership = self.conversation_member_repository.get_membership(
-            user_id, conversation_id, removed=True
-        )
-
-        if (
-            membership is not None
-            and membership.status == ConversationMemberStatus.ACTIVE
-        ):
-            return ServiceResult.fail(
-                {"membership": "User is already a member of this conversation."}
-            )
-
-        if membership is not None:
-            membership.status = ConversationMemberStatus.ACTIVE
-            membership.is_archived = False
-            membership.is_hidden = False
-
         if conversation.conversation_type == ConversationType.PRIVATE:
             return ServiceResult.fail(
-                {"conversation": "Private conversations can only contain two members."}
+                {"conversation": "Members cannot be added to private conversations."}
             )
 
         actor_membership_result = self._require_membership(actor_id, conversation_id)
@@ -90,8 +77,28 @@ class ConversationMemberService(BaseService):
                 {"permission": "Only administrators can add members."}
             )
 
+        membership = self.conversation_member_repository.get_membership(
+            user_id, conversation_id, removed=True
+        )
+
+        if (
+            membership is not None
+            and membership.status == ConversationMemberStatus.ACTIVE
+        ):
+            return ServiceResult.fail(
+                {"membership": "User is already a member of this conversation."}
+            )
+
+        if membership is not None:
+            membership.status = ConversationMemberStatus.ACTIVE
+            membership.role = clean_role
+            membership.is_archived = False
+            membership.is_hidden = False
+
+            return ServiceResult.ok(membership)
+
         membership = ConversationMember(
-            user_id=user_id, conversation_id=conversation_id, role=role
+            user_id=user_id, conversation_id=conversation_id, role=clean_role
         )
 
         membership = self.conversation_member_repository.create(

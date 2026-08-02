@@ -4,10 +4,10 @@ from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Text, DateTime, text, CheckConstraint, ForeignKey, Enum
+from sqlalchemy import DateTime, text, CheckConstraint, ForeignKey, Enum, String
 
 from app.database import Base
-from app.constants import MessageStatus, MessageDeliveryStatus
+from app.constants import MessageStatus, MessageDeliveryStatus, MESSAGE_MAX_LENGTH
 from app.utils import get_enum_values
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class Message(Base):
 
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(String(MESSAGE_MAX_LENGTH), nullable=False)
 
     status: Mapped[MessageStatus] = mapped_column(
         Enum(
