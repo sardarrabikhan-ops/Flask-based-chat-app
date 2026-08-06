@@ -7,6 +7,9 @@ from app.constants import FriendRequestStatus
 from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FriendRequestService(BaseService):
@@ -59,6 +62,12 @@ class FriendRequestService(BaseService):
         friend_request = FriendRequest(sender_id=sender_id, receiver_id=receiver_id)
         friend_request = self.friend_request_repository.create(friend_request)
 
+        logger.info(
+            "User sent a friend request to user. %s %s %s",
+            sender_result.data,
+            receiver_result.data,
+            friend_request,
+        )
         return ServiceResult.ok(friend_request, code=ResultCode.CREATED)
 
     def accept(
@@ -83,6 +92,12 @@ class FriendRequestService(BaseService):
         if isinstance(friendship_result, FailureResult):
             return friendship_result
 
+        logger.info(
+            "User accepted a friend request. %s %s %s",
+            friend_request.receiver,
+            friend_request.sender,
+            friend_request,
+        )
         return ServiceResult.ok(friend_request)
 
     def reject(
@@ -99,6 +114,12 @@ class FriendRequestService(BaseService):
 
         friend_request = result.data
 
+        logger.info(
+            "User rejected a friend request from user. %s %s %s",
+            friend_request.receiver,
+            friend_request.sender,
+            friend_request,
+        )
         return ServiceResult.ok(friend_request)
 
     def cancel(
@@ -115,6 +136,12 @@ class FriendRequestService(BaseService):
 
         friend_request = result.data
 
+        logger.info(
+            "User canceled a friend request. %s %s %s",
+            friend_request.sender,
+            friend_request.receiver,
+            friend_request,
+        )
         return ServiceResult.ok(friend_request)
 
     def get(

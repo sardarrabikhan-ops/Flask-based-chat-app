@@ -5,3 +5,4 @@ planning
 .gitinore
 *.zip
 *.pyc
+logs

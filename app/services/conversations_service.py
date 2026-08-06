@@ -12,6 +12,9 @@ from app.validators import ConversationValidator
 from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService(BaseService):
@@ -54,6 +57,7 @@ class ConversationService(BaseService):
 
         self.conversation_member_repository.create(membership)
 
+        logger.info("User created a group. %s %s", actor_result.data, conversation)
         return ServiceResult.ok(conversation, code=ResultCode.CREATED)
 
     def get_by_id(self, conversation_id: int | None) -> Result[Conversation]:
@@ -134,6 +138,11 @@ class ConversationService(BaseService):
 
         conversation.name = new_name.strip()
 
+        logger.info(
+            "User renamed conversation. %s %s",
+            actor_membership_result.data.user,
+            conversation,
+        )
         return ServiceResult.ok(conversation)
 
     def get_user_conversations(
@@ -171,6 +180,11 @@ class ConversationService(BaseService):
 
         membership.is_archived = True
 
+        logger.info(
+            "User archived conversation. %s %s",
+            result.data.user,
+            result.data.conversation,
+        )
         return ServiceResult.ok(membership)
 
     def delete(
@@ -186,5 +200,11 @@ class ConversationService(BaseService):
         membership = result.data
 
         membership.is_hidden = True
+
+        logger.info(
+            "User hid conversation. %s %s",
+            result.data.user,
+            result.data.conversation,
+        )
 
         return ServiceResult.ok(membership)

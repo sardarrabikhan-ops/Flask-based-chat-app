@@ -43,7 +43,7 @@ class User(Base):
     )
 
     def __repr__(self) -> str:
-        return f"User(id={self.id}, firstname={self.firstname}, lastname={self.lastname}, email={self.email}, phone_number={self.phone_number}, lock_until={self.lock_until}, failed_attempts={self.failed_attempts}, status={self.status}, created_at={self.created_at})"
+        return f"User(id={self.id}, firstname={self.firstname}, lastname={self.lastname}, email={self.email}, phone_number={self.phone_number}, lock_until={self.lock_until}, failed_attempts={self.failed_attempts}, status={self.status})"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 

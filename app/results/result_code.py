@@ -14,12 +14,10 @@ class ResultCode(Enum):
     UNAUTHORIZED = ("unauthorized", HTTPStatus.UNAUTHORIZED)
     FORBIDDEN = ("forbidden", HTTPStatus.FORBIDDEN)
     NOT_FOUND = ("not_found", HTTPStatus.NOT_FOUND)
+    METHOD_NOT_ALLOWED = ("method_not_allowed", HTTPStatus.METHOD_NOT_ALLOWED)
     CONFLICT = ("conflict", HTTPStatus.CONFLICT)
     LOCKED = ("locked", HTTPStatus.LOCKED)
-    INTERNAL_ERROR = (
-        "internal_error",
-        HTTPStatus.INTERNAL_SERVER_ERROR,
-    )
+    INTERNAL_SERVER_ERROR = ("internal_server_error", HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def __init__(
         self,

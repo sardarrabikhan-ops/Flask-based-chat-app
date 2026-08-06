@@ -36,7 +36,7 @@ class Message(Base):
     def __repr__(self) -> str:
         preview = self.content[:20] + "..." if len(self.content) > 20 else self.content
 
-        return f"Message(id={self.id}, sender_id={self.sender_id}, conversation_id={self.conversation_id}, content={preview}, status={self.status}, delivery_status={self.delivery_status}, created_at={self.created_at}, updated_at={self.updated_at})"
+        return f"Message(id={self.id}, sender_id={self.sender_id}, conversation_id={self.conversation_id}, content={preview}, status={self.status}, delivery_status={self.delivery_status}, updated_at={self.updated_at})"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 

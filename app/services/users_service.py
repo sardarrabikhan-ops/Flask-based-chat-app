@@ -13,6 +13,9 @@ from app.constants import (
 from app.results import ServiceResult, ResultCode, Result, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class UserService(BaseService):
@@ -137,14 +140,21 @@ class UserService(BaseService):
         if errors:
             return ServiceResult.fail(errors)
 
+        changed = False
         if firstname is not None and user.firstname != firstname:
             user.firstname = firstname
+            changed = True
 
         if lastname is not None and user.lastname != lastname:
             user.lastname = lastname
+            changed = True
 
         if phone_number is not None and user.phone_number != phone_number:
             user.phone_number = phone_number
+            changed = True
+
+        if changed:
+            logger.info("User updated profile. %s", user)
 
         return ServiceResult.ok(user)
 
@@ -202,6 +212,9 @@ class UserService(BaseService):
             )
 
         user.password = hash_password(new_password)
+
+        logger.info("User changed password. %s", user)
+
         return ServiceResult.ok(user)
 
     def delete(self, user_id: int | None) -> Result[User]:
@@ -225,5 +238,7 @@ class UserService(BaseService):
 
         for friendship in friendships:
             friendship.status = FriendStatus.REMOVED
+
+        logger.info("User deleted account. %s", user)
 
         return ServiceResult.ok(user)

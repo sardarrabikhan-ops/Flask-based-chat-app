@@ -14,6 +14,9 @@ from app.validators import ConversationMemberValidator
 from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationMemberService(BaseService):
@@ -93,6 +96,12 @@ class ConversationMemberService(BaseService):
             membership.is_archived = False
             membership.is_hidden = False
 
+            logger.info(
+                "User restored a conversation member. %s %s %s",
+                actor_membership.user,
+                membership.user,
+                membership.conversation,
+            )
             return ServiceResult.ok(membership)
 
         membership = ConversationMember(
@@ -103,6 +112,12 @@ class ConversationMemberService(BaseService):
             conversation_member=membership
         )
 
+        logger.info(
+            "User added a member to conversation. %s %s %s",
+            actor_membership.user,
+            membership.user,
+            membership.conversation,
+        )
         return ServiceResult.ok(membership, code=ResultCode.CREATED)
 
     def get_member(
@@ -173,6 +188,12 @@ class ConversationMemberService(BaseService):
         membership.status = ConversationMemberStatus.REMOVED
         membership.is_hidden = True
 
+        logger.info(
+            "User removed a member from conversation. %s %s %s",
+            actor_membership.user,
+            membership.user,
+            membership.conversation,
+        )
         return ServiceResult.ok(membership)
 
     def leave(
@@ -190,4 +211,9 @@ class ConversationMemberService(BaseService):
         membership.status = ConversationMemberStatus.LEFT
         membership.is_hidden = True
 
+        logger.info(
+            "User left conversation. %s %s",
+            membership.user,
+            membership.conversation,
+        )
         return ServiceResult.ok(membership)

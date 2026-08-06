@@ -12,13 +12,19 @@ from app.validators import MessageValidator
 from app.results import ServiceResult, ResultCode, Result, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MessageService(BaseService):
     """Provides message-related business logic."""
 
     def send_in_conversation(
-        self, sender_id: int | None, conversation_id: int | None, content: str | None
+        self,
+        sender_id: int | None,
+        conversation_id: int | None,
+        content: str | None,
     ) -> Result[Message]:
         """
         Send a message to conversation.
@@ -54,6 +60,11 @@ class MessageService(BaseService):
 
         message = self.message_repository.create(message)
 
+        logger.info(
+            "User sent a message in conversation. %s %s",
+            result.data.user,
+            result.data.conversation,
+        )
         return ServiceResult.ok(message, code=ResultCode.CREATED)
 
     def send_private(
@@ -112,6 +123,8 @@ class MessageService(BaseService):
             )
             self.conversation_member_repository.create(membership)
 
+            logger.info("Conversation created due to first message. %s", conversation)
+
         result = self._require_membership(sender_id, conversation.id)
 
         if isinstance(result, FailureResult):
@@ -144,6 +157,11 @@ class MessageService(BaseService):
 
         message = self.message_repository.create(message)
 
+        logger.info(
+            "User sent a message in conversation. %s %s",
+            result.data.user,
+            result.data.conversation,
+        )
         return ServiceResult.ok(message, code=ResultCode.CREATED)
 
     def get_by_id(self, message_id: int | None) -> Result[Message]:
@@ -178,21 +196,21 @@ class MessageService(BaseService):
     ) -> Result[Message]:
         """Edit the message content and returns it"""
 
-        result = self._require_user(user_id)
+        user_result = self._require_user(user_id)
 
-        if isinstance(result, FailureResult):
-            return result
+        if isinstance(user_result, FailureResult):
+            return user_result
 
         assert user_id is not None
 
-        user = result.data
+        user = user_result.data
 
-        result = self._require_message(message_id)
+        message_result = self._require_message(message_id)
 
-        if isinstance(result, FailureResult):
-            return result
+        if isinstance(message_result, FailureResult):
+            return message_result
 
-        message = result.data
+        message = message_result.data
 
         if message.sender != user:
             return ServiceResult.fail(
@@ -207,6 +225,12 @@ class MessageService(BaseService):
 
         if message.content != content.strip():
             message.content = content.strip()
+
+            logger.info(
+                "User edited a message. %s %s",
+                user_result.data,
+                message_result.data,
+            )
 
         return ServiceResult.ok(message)
 
@@ -237,6 +261,7 @@ class MessageService(BaseService):
 
         message.status = MessageStatus.DELETED
 
+        logger.info("User deleted a message. %s %s", user, message)
         return ServiceResult.ok(message)
 
     def mark_delivered(

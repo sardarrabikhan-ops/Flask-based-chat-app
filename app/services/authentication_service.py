@@ -20,6 +20,9 @@ from app.constants import (
 from app.results import ServiceResult, ResultCode, Result
 
 from datetime import UTC, datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AuthenticationService(BaseService):
@@ -86,9 +89,12 @@ class AuthenticationService(BaseService):
             return ServiceResult.fail(errors)
 
         if user is not None:
-            return self._reactivate_deleted_user(
+            result = self._reactivate_deleted_user(
                 user, firstname, lastname, phone_number, password
             )
+
+            logger.info("User restored. %s", user)
+            return result
 
         # Format values for storage.
         password = hash_password(password)
@@ -102,6 +108,8 @@ class AuthenticationService(BaseService):
         )
 
         user = self.user_repository.create(user)
+
+        logger.info("User registered. %s", user)
 
         return ServiceResult.ok(user, code=ResultCode.CREATED)
 
@@ -163,6 +171,8 @@ class AuthenticationService(BaseService):
 
             if user.failed_attempts >= MAX_LOGIN_ATTEMPTS:
                 user.status = UserStatus.BLOCKED
+
+                logger.warning("User blocked due to maximum failed attempts. %s", user)
                 return ServiceResult.fail(
                     {
                         "account": "Your account has been blocked. Please contact support."
@@ -185,4 +195,5 @@ class AuthenticationService(BaseService):
         user.failed_attempts = 0
         user.lock_until = None
 
+        logger.info("User logged in. %s", user)
         return ServiceResult.ok(user)

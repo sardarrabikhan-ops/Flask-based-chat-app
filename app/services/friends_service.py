@@ -7,6 +7,9 @@ from app.constants import FriendStatus, UserStatus
 from app.results import ServiceResult, Result, FailureResult
 
 from typing import Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FriendService(BaseService):
@@ -47,9 +50,7 @@ class FriendService(BaseService):
 
         return ServiceResult.ok(friends)
 
-    def delete(
-        self, user_id: int | None, friend_id: int | None
-    ) -> Result[Friend]:
+    def delete(self, user_id: int | None, friend_id: int | None) -> Result[Friend]:
         """Soft-delete a friend by marking its status as REMOVED."""
 
         friendship_result = self._require_friendship(user_id, friend_id)
@@ -61,4 +62,12 @@ class FriendService(BaseService):
 
         friendship.status = FriendStatus.REMOVED
 
+        if friendship.user_id == user_id:
+            removed_friend = friendship.friend
+            actor = friendship.user
+        else:
+            removed_friend = friendship.user
+            actor = friendship.friend
+
+        logger.info("User removed a friend. %s %s", actor, removed_friend)
         return ServiceResult.ok(friendship)
