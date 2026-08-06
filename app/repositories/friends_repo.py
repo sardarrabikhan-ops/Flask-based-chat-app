@@ -18,7 +18,7 @@ class FriendRepository(BaseRepository):
         friend_id: int,
     ) -> Friend | None:
 
-        user_id, friend_id = sorted([user_id, friend_id])
+        user_id, friend_id = sorted((user_id, friend_id))
 
         statement = select(Friend).where(
             Friend.user_id == user_id, Friend.friend_id == friend_id
@@ -68,7 +68,7 @@ class FriendRepository(BaseRepository):
 
     def exists(self, user_id: int, friend_id: int, deleted: bool = False) -> bool:
 
-        user_id, friend_id = sorted([user_id, friend_id])
+        user_id, friend_id = sorted((user_id, friend_id))
 
         statement = select(Friend).where(
             Friend.user_id == user_id,

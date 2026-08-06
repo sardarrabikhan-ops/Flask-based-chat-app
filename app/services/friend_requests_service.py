@@ -3,8 +3,8 @@
 from app.models import FriendRequest
 from app.services import BaseService
 
-from app.schemas import ServiceResult
 from app.constants import FriendRequestStatus
+from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
 
@@ -14,7 +14,7 @@ class FriendRequestService(BaseService):
 
     def send(
         self, sender_id: int | None, receiver_id: int | None
-    ) -> ServiceResult[FriendRequest]:
+    ) -> Result[FriendRequest]:
         """Send a friend request to receiver."""
 
         if sender_id == receiver_id:
@@ -24,24 +24,24 @@ class FriendRequestService(BaseService):
 
         sender_result = self._require_user(sender_id)
 
-        if not sender_result.success:
-            assert sender_result.errors is not None
-            return ServiceResult.fail(sender_result.errors)
+        if isinstance(sender_result, FailureResult):
+            return sender_result
 
         assert sender_id is not None
 
         receiver_result = self._require_receiver(receiver_id)
 
-        if not receiver_result.success:
-            assert receiver_result.errors is not None
-            return ServiceResult.fail(receiver_result.errors)
+        if isinstance(receiver_result, FailureResult):
+            return receiver_result
 
         assert receiver_id is not None
 
         is_friend = self.friend_repository.exists(sender_id, receiver_id)
 
         if is_friend:
-            return ServiceResult.fail({"friendship": "Friendship already exists."})
+            return ServiceResult.fail(
+                {"friendship": "Friendship already exists."}, code=ResultCode.CONFLICT
+            )
 
         is_request = self.friend_request_repository.exists(
             sender_id, receiver_id, FriendRequestStatus.PENDING
@@ -52,51 +52,50 @@ class FriendRequestService(BaseService):
 
         if is_request or is_reverse_request:
             return ServiceResult.fail(
-                {"friend_request": "A pending friend request already exist."}
+                {"friend_request": "A pending friend request already exist."},
+                code=ResultCode.CONFLICT,
             )
 
         friend_request = FriendRequest(sender_id=sender_id, receiver_id=receiver_id)
         friend_request = self.friend_request_repository.create(friend_request)
 
-        return ServiceResult.ok(friend_request)
+        return ServiceResult.ok(friend_request, code=ResultCode.CREATED)
 
     def accept(
         self, sender_id: int | None, receiver_id: int | None
-    ) -> ServiceResult[FriendRequest]:
+    ) -> Result[FriendRequest]:
         """Accept the friend request by marking it's status as ACCEPTED."""
 
         result = self._change_friend_request_status(
             sender_id, receiver_id, FriendRequestStatus.ACCEPTED
         )
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert sender_id is not None
         assert receiver_id is not None
-        assert result.data is not None
 
         friend_request = result.data
 
-        self._create_friendship(sender_id, receiver_id)
+        friendship_result = self._create_friendship(sender_id, receiver_id)
+
+        if isinstance(friendship_result, FailureResult):
+            return friendship_result
 
         return ServiceResult.ok(friend_request)
 
     def reject(
         self, sender_id: int | None, receiver_id: int | None
-    ) -> ServiceResult[FriendRequest]:
+    ) -> Result[FriendRequest]:
         """Reject the friend request by marking it's status as REJECTED."""
 
         result = self._change_friend_request_status(
             sender_id, receiver_id, FriendRequestStatus.REJECTED
         )
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
-
-        assert result.data is not None
+        if isinstance(result, FailureResult):
+            return result
 
         friend_request = result.data
 
@@ -104,18 +103,15 @@ class FriendRequestService(BaseService):
 
     def cancel(
         self, sender_id: int | None, receiver_id: int | None
-    ) -> ServiceResult[FriendRequest]:
+    ) -> Result[FriendRequest]:
         """Cancel the friend request by marking it's status as CANCELED."""
 
         result = self._change_friend_request_status(
             sender_id, receiver_id, FriendRequestStatus.CANCELED
         )
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
-
-        assert result.data is not None
+        if isinstance(result, FailureResult):
+            return result
 
         friend_request = result.data
 
@@ -126,22 +122,20 @@ class FriendRequestService(BaseService):
         sender_id: int | None,
         receiver_id: int | None,
         status: FriendRequestStatus = FriendRequestStatus.PENDING,
-    ) -> ServiceResult[Sequence[FriendRequest]]:
+    ) -> Result[Sequence[FriendRequest]]:
         """Return all the friend request belongs to the sender_id user and receiver_id user. By default it returns the pending requests."""
 
         sender_result = self._require_user(sender_id)
 
-        if not sender_result.success:
-            assert sender_result.errors is not None
-            return ServiceResult.fail(sender_result.errors)
+        if isinstance(sender_result, FailureResult):
+            return sender_result
 
         assert sender_id is not None
 
         receiver_result = self._require_receiver(receiver_id)
 
-        if not receiver_result.success:
-            assert receiver_result.errors is not None
-            return ServiceResult.fail(receiver_result.errors)
+        if isinstance(receiver_result, FailureResult):
+            return receiver_result
 
         assert receiver_id is not None
 
@@ -154,22 +148,20 @@ class FriendRequestService(BaseService):
     def get_sent_requests(
         self,
         sender_id: int | None,
-        status: FriendRequestStatus = FriendRequestStatus.PENDING,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[FriendRequest]]:
-        """Return all friend requests sent by the given user. By default it returns the pending requests."""
+    ) -> Result[Sequence[FriendRequest]]:
+        """Return all pending friend requests sent by the given user."""
 
         sender_result = self._require_user(sender_id)
 
-        if not sender_result.success:
-            assert sender_result.errors is not None
-            return ServiceResult.fail(sender_result.errors)
+        if isinstance(sender_result, FailureResult):
+            return sender_result
 
         assert sender_id is not None
 
         friend_requests = self.friend_request_repository.get_by_sender_id(
-            sender_id, status=status, limit=limit, offset=offset
+            sender_id, status=FriendRequestStatus.PENDING, limit=limit, offset=offset
         )
 
         return ServiceResult.ok(friend_requests)
@@ -177,22 +169,20 @@ class FriendRequestService(BaseService):
     def get_received_requests(
         self,
         receiver_id: int | None,
-        status: FriendRequestStatus = FriendRequestStatus.PENDING,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[FriendRequest]]:
-        """Return all friend requests received by the given user. By default it returns the pending requests."""
+    ) -> Result[Sequence[FriendRequest]]:
+        """Return all pending friend requests received by the given user."""
 
         receiver_result = self._require_receiver(receiver_id)
 
-        if not receiver_result.success:
-            assert receiver_result.errors is not None
-            return ServiceResult.fail(receiver_result.errors)
+        if isinstance(receiver_result, FailureResult):
+            return receiver_result
 
         assert receiver_id is not None
 
         friend_requests = self.friend_request_repository.get_by_receiver_id(
-            receiver_id, status=status, limit=limit, offset=offset
+            receiver_id, status=FriendRequestStatus.PENDING, limit=limit, offset=offset
         )
 
         return ServiceResult.ok(friend_requests)

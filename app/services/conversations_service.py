@@ -3,13 +3,13 @@
 from app.models import Conversation, ConversationMember
 from app.services import BaseService
 
-from app.schemas import ServiceResult
 from app.constants import (
     ConversationType,
     ConversationMemberRole,
 )
 
 from app.validators import ConversationValidator
+from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
 
@@ -17,7 +17,9 @@ from typing import Sequence
 class ConversationService(BaseService):
     """Provides conversation-related business logic."""
 
-    def create_group(self, name: str | None) -> ServiceResult[Conversation]:
+    def create_group(
+        self, actor_id: int | None, name: str | None
+    ) -> Result[Conversation]:
         """
         Create a new conversation.
 
@@ -30,6 +32,13 @@ class ConversationService(BaseService):
 
         assert name is not None
 
+        actor_result = self._require_user(actor_id)
+
+        if isinstance(actor_result, FailureResult):
+            return actor_result
+
+        assert actor_id is not None
+
         conversation = Conversation(
             name=name.strip(),
             conversation_type=ConversationType.GROUP,
@@ -37,9 +46,17 @@ class ConversationService(BaseService):
 
         conversation = self.conversation_repository.create(conversation)
 
-        return ServiceResult.ok(conversation)
+        membership = ConversationMember(
+            user_id=actor_id,
+            conversation_id=conversation.id,
+            role=ConversationMemberRole.ADMIN,
+        )
 
-    def get_by_id(self, conversation_id: int | None) -> ServiceResult[Conversation]:
+        self.conversation_member_repository.create(membership)
+
+        return ServiceResult.ok(conversation, code=ResultCode.CREATED)
+
+    def get_by_id(self, conversation_id: int | None) -> Result[Conversation]:
         """Return the conversation with the given ID"""
 
         return self._require_conversation(conversation_id)
@@ -50,7 +67,7 @@ class ConversationService(BaseService):
         conversation_name: str | None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[Conversation]]:
+    ) -> Result[Sequence[Conversation]]:
         """Search the conversations with the given name"""
 
         if conversation_name is None:
@@ -67,9 +84,8 @@ class ConversationService(BaseService):
 
         result = self._require_user(user_id)
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert user_id is not None
 
@@ -80,8 +96,11 @@ class ConversationService(BaseService):
         return ServiceResult.ok(conversations)
 
     def rename(
-        self, actor_id: int | None, conversation_id: int | None, new_name: str | None
-    ) -> ServiceResult[Conversation]:
+        self,
+        actor_id: int | None,
+        conversation_id: int | None,
+        new_name: str | None,
+    ) -> Result[Conversation]:
         """
         Rename a conversation.
 
@@ -89,33 +108,24 @@ class ConversationService(BaseService):
             ServiceResult containing the updated conversation or validation errors.
         """
 
-        result = self._require_conversation(conversation_id)
+        actor_membership_result = self._require_membership(actor_id, conversation_id)
 
-        if not result.success:
-            return result
+        if isinstance(actor_membership_result, FailureResult):
+            return actor_membership_result
 
-        assert conversation_id is not None
-        assert result.data is not None
-
-        conversation = result.data
+        actor_membership = actor_membership_result.data
+        conversation = actor_membership.conversation
 
         if conversation.conversation_type == ConversationType.PRIVATE:
             return ServiceResult.fail(
                 {"conversation": "Private conversations cannot have a name."}
             )
 
-        actor_membership_result = self._require_membership(actor_id, conversation_id)
-
-        if not actor_membership_result.success:
-            assert actor_membership_result.errors is not None
-            return ServiceResult.fail(actor_membership_result.errors)
-
-        assert actor_membership_result.data is not None
-
-        actor_membership = actor_membership_result.data
-
         if actor_membership.role != ConversationMemberRole.ADMIN:
-            return ServiceResult.fail({"user": "Only administrators can rename conversation."})
+            return ServiceResult.fail(
+                {"permission": "Only administrators can rename conversation."},
+                code=ResultCode.FORBIDDEN,
+            )
 
         if error := ConversationValidator.name(new_name):
             return ServiceResult.fail({"name": error})
@@ -131,14 +141,13 @@ class ConversationService(BaseService):
         user_id: int | None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[Conversation]]:
+    ) -> Result[Sequence[Conversation]]:
         """Return the conversations for the given user ID."""
 
         result = self._require_user(user_id)
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert user_id is not None
 
@@ -150,15 +159,13 @@ class ConversationService(BaseService):
 
     def archive(
         self, conversation_id: int | None, user_id: int | None
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """Archive the membership of the given ID's."""
 
         result = self._require_membership(user_id, conversation_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
-
-        assert result.data is not None
 
         membership = result.data
 
@@ -168,15 +175,13 @@ class ConversationService(BaseService):
 
     def delete(
         self, conversation_id: int | None, user_id: int | None
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """Soft-delete the membership of the given ID's."""
 
         result = self._require_membership(user_id, conversation_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
-
-        assert result.data is not None
 
         membership = result.data
 

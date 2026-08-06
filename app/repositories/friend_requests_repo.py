@@ -96,6 +96,6 @@ class FriendRequestRepository(BaseRepository):
 
         return self.session.scalars(statement).all()
 
-    def create(self, friend_request: FriendRequest) -> FriendRequest | None:
+    def create(self, friend_request: FriendRequest) -> FriendRequest:
         self.session.add(friend_request)
         return friend_request

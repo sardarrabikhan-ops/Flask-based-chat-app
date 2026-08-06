@@ -3,6 +3,9 @@
 from enum import Enum
 import os
 import phonenumbers
+from datetime import timedelta
+
+from app.constants import LOGIN_LOCKS
 
 
 def require_env(name: str) -> str:
@@ -63,3 +66,14 @@ def format_set(char_set: set[str]) -> str:
         return items[0]
 
     return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def get_lock_duration(failed_attempts: int) -> timedelta | None:
+
+    lock_duration = None
+    for attempts in sorted(LOGIN_LOCKS.keys(), reverse=True):
+        if failed_attempts >= attempts:
+            lock_duration = LOGIN_LOCKS[attempts]
+            break
+
+    return lock_duration

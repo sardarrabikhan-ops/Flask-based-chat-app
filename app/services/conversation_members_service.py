@@ -3,7 +3,6 @@
 from app.models import ConversationMember, User
 from app.services import BaseService
 
-from app.schemas import ServiceResult
 from app.constants import (
     UserStatus,
     ConversationMemberRole,
@@ -12,6 +11,7 @@ from app.constants import (
 )
 
 from app.validators import ConversationMemberValidator
+from app.results import ServiceResult, Result, ResultCode, FailureResult
 
 from typing import Sequence
 
@@ -25,7 +25,7 @@ class ConversationMemberService(BaseService):
         conversation_id: int | None,
         role: str | None,
         actor_id: int | None,
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """
         Add a member to conversation and Add the membership into the database.
         Returns:
@@ -41,40 +41,37 @@ class ConversationMemberService(BaseService):
 
         result = self._require_user(user_id)
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert user_id is not None
 
         result = self._require_conversation(conversation_id)
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert conversation_id is not None
-        assert result.data is not None
 
         conversation = result.data
 
         if conversation.conversation_type == ConversationType.PRIVATE:
             return ServiceResult.fail(
-                {"conversation": "Members cannot be added to private conversations."}
+                {"permission": "Members cannot be added to private conversations."},
+                code=ResultCode.FORBIDDEN,
             )
 
         actor_membership_result = self._require_membership(actor_id, conversation_id)
 
-        if not actor_membership_result.success:
+        if isinstance(actor_membership_result, FailureResult):
             return actor_membership_result
-
-        assert actor_membership_result.data is not None
 
         actor_membership = actor_membership_result.data
 
         if actor_membership.role != ConversationMemberRole.ADMIN:
             return ServiceResult.fail(
-                {"permission": "Only administrators can add members."}
+                {"permission": "Only administrators can add members."},
+                code=ResultCode.FORBIDDEN,
             )
 
         membership = self.conversation_member_repository.get_membership(
@@ -86,7 +83,8 @@ class ConversationMemberService(BaseService):
             and membership.status == ConversationMemberStatus.ACTIVE
         ):
             return ServiceResult.fail(
-                {"membership": "User is already a member of this conversation."}
+                {"membership": "User is already a member of this conversation."},
+                code=ResultCode.CONFLICT,
             )
 
         if membership is not None:
@@ -105,11 +103,11 @@ class ConversationMemberService(BaseService):
             conversation_member=membership
         )
 
-        return ServiceResult.ok(membership)
+        return ServiceResult.ok(membership, code=ResultCode.CREATED)
 
     def get_member(
         self, user_id: int | None, conversation_id: int | None
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """Return the membership for the given user ID and conversation ID."""
 
         return self._require_membership(user_id, conversation_id)
@@ -119,14 +117,13 @@ class ConversationMemberService(BaseService):
         conversation_id: int | None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[User]]:
+    ) -> Result[Sequence[User]]:
         """Return the members for the given conversation ID."""
 
         result = self._require_conversation(conversation_id)
 
-        if not result.success:
-            assert result.errors is not None
-            return ServiceResult.fail(result.errors)
+        if isinstance(result, FailureResult):
+            return result
 
         assert conversation_id is not None
 
@@ -134,42 +131,44 @@ class ConversationMemberService(BaseService):
             conversation_id, limit, offset
         )
 
-        members: list[User] = []
-
-        for membership in memberships:
-            if membership.user.status == UserStatus.DELETED:
-                continue
-            members.append(membership.user)
+        members = [
+            membership.user
+            for membership in memberships
+            if membership.user.status != UserStatus.DELETED
+        ]
 
         return ServiceResult.ok(members)
 
     def remove_member(
         self, actor_id: int | None, user_id: int | None, conversation_id: int | None
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """Soft-delete the membership of the given ID's by marking it's status as REMOVED."""
 
         actor_membership_result = self._require_membership(actor_id, conversation_id)
 
-        if not actor_membership_result.success:
+        if isinstance(actor_membership_result, FailureResult):
             return actor_membership_result
-
-        assert actor_membership_result.data is not None
 
         actor_membership = actor_membership_result.data
 
         if actor_membership.role != ConversationMemberRole.ADMIN:
             return ServiceResult.fail(
-                {"permission": "Only administrators can remove members."}
+                {"permission": "Only administrators can remove members."},
+                code=ResultCode.FORBIDDEN,
             )
 
         result = self._require_membership(user_id, conversation_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
 
-        assert result.data is not None
-
         membership = result.data
+
+        if membership.role == ConversationMemberRole.ADMIN:
+            return ServiceResult.fail(
+                {"permission": "You cannot remove administrators."},
+                code=ResultCode.FORBIDDEN,
+            )
 
         membership.status = ConversationMemberStatus.REMOVED
         membership.is_hidden = True
@@ -178,15 +177,13 @@ class ConversationMemberService(BaseService):
 
     def leave(
         self, user_id: int | None, conversation_id: int | None
-    ) -> ServiceResult[ConversationMember]:
+    ) -> Result[ConversationMember]:
         """Soft-delete the membership of the given ID's by marking it's status as REMOVED."""
 
         result = self._require_membership(user_id, conversation_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
-
-        assert result.data is not None
 
         membership = result.data
 

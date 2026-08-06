@@ -5,9 +5,9 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.config import Config
 
-engine = create_engine(Config.DB_URL)
+engine = create_engine(Config.DB_URL, pool_pre_ping=True)
 
-Session: sessionmaker = sessionmaker(bind=engine)
+SessionLocal: sessionmaker = sessionmaker(bind=engine)
 
 
 class Base(DeclarativeBase):

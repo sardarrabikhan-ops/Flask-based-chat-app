@@ -10,7 +10,7 @@ from app.constants import (
     UserStatus,
     FriendStatus,
 )
-from app.schemas import ServiceResult
+from app.results import ServiceResult, ResultCode, Result, FailureResult
 
 from typing import Sequence
 
@@ -23,7 +23,7 @@ class UserService(BaseService):
         status: UserStatus | None = UserStatus.ACTIVE,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ServiceResult[Sequence[User]]:
+    ) -> Result[Sequence[User]]:
         """Return all users."""
 
         users = self.user_repository.get_all(
@@ -32,23 +32,26 @@ class UserService(BaseService):
 
         return ServiceResult.ok(users)
 
-    def get_by_id(self, user_id: int | None) -> ServiceResult[User]:
+    def get_by_id(self, user_id: int | None) -> Result[User]:
         """Return the user with the given ID"""
 
         return self._require_user(user_id)
 
     def search_by_name(
-        self, name: str | None, limit: int | None = None, offset: int | None = None
-    ) -> ServiceResult[Sequence[User]]:
+        self,
+        name: str | None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Result[Sequence[User]]:
         """Search the users with the given name"""
 
         if name is None:
-            return ServiceResult.fail({"name": "name is required."})
+            return ServiceResult.fail({"name": "Name is required."})
 
         name = " ".join(name.split())
 
         if not name:
-            return ServiceResult.fail({"name": "name is required."})
+            return ServiceResult.fail({"name": "Name is required."})
 
         users = self.user_repository.search_by_name(
             name, status=UserStatus.ACTIVE, limit=limit, offset=offset
@@ -56,7 +59,7 @@ class UserService(BaseService):
 
         return ServiceResult.ok(users)
 
-    def get_by_email(self, email: str | None) -> ServiceResult[User]:
+    def get_by_email(self, email: str | None) -> Result[User]:
         """Return the user with the given email"""
 
         if error := LoginValidator.email_address(email):
@@ -69,10 +72,14 @@ class UserService(BaseService):
         user = self.user_repository.get_by_email(email)
 
         if user is None:
-            return ServiceResult.fail({"email": "User not found."})
+            return ServiceResult.fail(
+                {"email": "User not found."}, code=ResultCode.NOT_FOUND
+            )
 
         if user.status == UserStatus.BLOCKED:
-            return ServiceResult.fail({"email": "User is blocked."})
+            return ServiceResult.fail(
+                {"email": "User is blocked."}, code=ResultCode.LOCKED
+            )
 
         return ServiceResult.ok(user)
 
@@ -82,7 +89,7 @@ class UserService(BaseService):
         firstname: str | None = None,
         lastname: str | None = None,
         phone_number: str | None = None,
-    ) -> ServiceResult[User]:
+    ) -> Result[User]:
         """
         Update a user's profile.
 
@@ -92,11 +99,10 @@ class UserService(BaseService):
 
         result = self._require_user(user_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
 
         assert user_id is not None
-        assert result.data is not None
 
         user = result.data
 
@@ -148,7 +154,7 @@ class UserService(BaseService):
         current_password: str | None,
         new_password: str | None,
         confirm_password: str | None,
-    ) -> ServiceResult[User]:
+    ) -> Result[User]:
         """
         Update the user's password.
 
@@ -158,11 +164,10 @@ class UserService(BaseService):
 
         result = self._require_user(user_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
 
         assert user_id is not None
-        assert result.data is not None
 
         user = result.data
 
@@ -199,16 +204,15 @@ class UserService(BaseService):
         user.password = hash_password(new_password)
         return ServiceResult.ok(user)
 
-    def delete(self, user_id: int | None) -> ServiceResult[User]:
+    def delete(self, user_id: int | None) -> Result[User]:
         """Soft-delete a user by marking its status as DELETED."""
 
         result = self._require_user(user_id)
 
-        if not result.success:
+        if isinstance(result, FailureResult):
             return result
 
         assert user_id is not None
-        assert result.data is not None
 
         user = result.data
 

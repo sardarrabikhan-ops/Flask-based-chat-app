@@ -3,15 +3,21 @@
 from app.models import User
 from app.services import BaseService
 
-from app.schemas import ServiceResult
-from app.utils import format_phone_number, format_time, hash_password, verify_password
+from app.utils import (
+    format_phone_number,
+    format_time,
+    hash_password,
+    verify_password,
+    get_lock_duration,
+)
 
 from app.validators import RegisterValidator, LoginValidator
 from app.constants import (
     UserStatus,
-    LOGIN_LOCKS,
     MAX_LOGIN_ATTEMPTS,
 )
+
+from app.results import ServiceResult, ResultCode, Result
 
 from datetime import UTC, datetime
 
@@ -27,7 +33,7 @@ class AuthenticationService(BaseService):
         phone_number: str | None,
         password: str | None,
         confirm_password: str | None,
-    ) -> ServiceResult[User]:
+    ) -> Result[User]:
         """
         Register a new user.
 
@@ -80,10 +86,9 @@ class AuthenticationService(BaseService):
             return ServiceResult.fail(errors)
 
         if user is not None:
-            self._restore_deleted_user(
+            return self._reactivate_deleted_user(
                 user, firstname, lastname, phone_number, password
             )
-            return ServiceResult.ok(user)
 
         # Format values for storage.
         password = hash_password(password)
@@ -98,9 +103,9 @@ class AuthenticationService(BaseService):
 
         user = self.user_repository.create(user)
 
-        return ServiceResult.ok(user)
+        return ServiceResult.ok(user, code=ResultCode.CREATED)
 
-    def login(self, email: str | None, password: str | None) -> ServiceResult[User]:
+    def login(self, email: str | None, password: str | None) -> Result[User]:
         """
         Authenticate a user.
 
@@ -136,7 +141,8 @@ class AuthenticationService(BaseService):
         # validating status
         if user.status == UserStatus.BLOCKED:
             return ServiceResult.fail(
-                {"account": "Your account has been blocked. Please contact support."}
+                {"account": "Your account has been blocked. Please contact support."},
+                code=ResultCode.LOCKED,
             )
 
         # Verify account lock time.
@@ -146,7 +152,8 @@ class AuthenticationService(BaseService):
             return ServiceResult.fail(
                 {
                     "account": f"Your account is temporarily locked. Please try again after {free_time}."
-                }
+                },
+                code=ResultCode.LOCKED,
             )
 
         # verifying password
@@ -156,26 +163,24 @@ class AuthenticationService(BaseService):
 
             if user.failed_attempts >= MAX_LOGIN_ATTEMPTS:
                 user.status = UserStatus.BLOCKED
-                errors["account"] = (
-                    "Your account has been blocked. Please contact support."
+                return ServiceResult.fail(
+                    {
+                        "account": "Your account has been blocked. Please contact support."
+                    },
+                    code=ResultCode.LOCKED,
                 )
 
-            else:
+            lock_duration = get_lock_duration(user.failed_attempts)
+            if lock_duration is not None:
+                user.lock_until = current_time + lock_duration
+                return ServiceResult.fail(
+                    {
+                        "account": f"Your account is locked for {format_time(lock_duration.total_seconds())}!"
+                    },
+                    code=ResultCode.LOCKED,
+                )
 
-                lock_duration = None
-                for attempts in sorted(LOGIN_LOCKS.keys(), reverse=True):
-                    if user.failed_attempts >= attempts:
-                        lock_duration = LOGIN_LOCKS[attempts]
-                        break
-
-                if lock_duration is not None:
-                    user.lock_until = current_time + lock_duration
-                    errors["account"] = (
-                        f"Your account is locked for {format_time(lock_duration.total_seconds())}!"
-                    )
-
-            errors["email"] = "Incorrect email or password."
-            return ServiceResult.fail(errors)
+            return ServiceResult.fail({"email": "Incorrect email or password."})
 
         user.failed_attempts = 0
         user.lock_until = None

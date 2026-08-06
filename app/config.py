@@ -1,6 +1,6 @@
 # app/config.py
 
-from app.utils import require_env
+from app.utils.helpers import require_env
 from dotenv import load_dotenv
 import os
 
