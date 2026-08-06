@@ -30,22 +30,6 @@ class FriendRequestRepository(BaseRepository):
 
         return self.session.scalars(statement).all()
 
-    def get_one(
-        self,
-        sender_id: int,
-        receiver_id: int,
-        status: FriendRequestStatus | None = None,
-    ) -> FriendRequest | None:
-        statement = select(FriendRequest).where(
-            FriendRequest.sender_id == sender_id,
-            FriendRequest.receiver_id == receiver_id,
-        )
-
-        if status is not None:
-            statement = statement.where(FriendRequest.status == status)
-
-        return self.session.scalar(statement)
-
     def exists(
         self,
         sender_id: int,

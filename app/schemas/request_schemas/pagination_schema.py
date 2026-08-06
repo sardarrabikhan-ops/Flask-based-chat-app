@@ -30,6 +30,9 @@ class PaginationSchema:
                 if limit <= 0:
                     errors["limit"] = "Limit must be more than 0."
 
+                if limit > 500:
+                    errors["limit"] = "Limit must be less than 500."
+
             except (TypeError, ValueError):
                 errors["limit"] = "Limit must be an integer."
 

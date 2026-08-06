@@ -71,26 +71,30 @@ class FriendRequestService(BaseService):
         return ServiceResult.ok(friend_request, code=ResultCode.CREATED)
 
     def accept(
-        self, sender_id: int | None, receiver_id: int | None
+        self, friend_request_id: int | None, actor_id: int | None
     ) -> Result[FriendRequest]:
         """Accept the friend request by marking it's status as ACCEPTED."""
 
-        result = self._change_friend_request_status(
-            sender_id, receiver_id, FriendRequestStatus.ACCEPTED
+        result = self._require_friend_request_action(
+            friend_request_id,
+            actor_id,
+            require_sender=False,
         )
 
         if isinstance(result, FailureResult):
             return result
 
-        assert sender_id is not None
-        assert receiver_id is not None
-
         friend_request = result.data
 
-        friendship_result = self._create_friendship(sender_id, receiver_id)
+        friendship_result = self._create_friendship(
+            friend_request.sender_id,
+            friend_request.receiver_id,
+        )
 
         if isinstance(friendship_result, FailureResult):
             return friendship_result
+
+        friend_request.status = FriendRequestStatus.ACCEPTED
 
         logger.info(
             "User accepted a friend request. %s %s %s",
@@ -101,18 +105,22 @@ class FriendRequestService(BaseService):
         return ServiceResult.ok(friend_request)
 
     def reject(
-        self, sender_id: int | None, receiver_id: int | None
+        self, friend_request_id: int | None, actor_id: int | None
     ) -> Result[FriendRequest]:
         """Reject the friend request by marking it's status as REJECTED."""
 
-        result = self._change_friend_request_status(
-            sender_id, receiver_id, FriendRequestStatus.REJECTED
+        result = self._require_friend_request_action(
+            friend_request_id,
+            actor_id,
+            require_sender=False,
         )
 
         if isinstance(result, FailureResult):
             return result
 
         friend_request = result.data
+
+        friend_request.status = FriendRequestStatus.REJECTED
 
         logger.info(
             "User rejected a friend request from user. %s %s %s",
@@ -123,18 +131,22 @@ class FriendRequestService(BaseService):
         return ServiceResult.ok(friend_request)
 
     def cancel(
-        self, sender_id: int | None, receiver_id: int | None
+        self, friend_request_id: int | None, actor_id: int | None
     ) -> Result[FriendRequest]:
         """Cancel the friend request by marking it's status as CANCELED."""
 
-        result = self._change_friend_request_status(
-            sender_id, receiver_id, FriendRequestStatus.CANCELED
+        result = self._require_friend_request_action(
+            friend_request_id,
+            actor_id,
+            require_sender=True,
         )
 
         if isinstance(result, FailureResult):
             return result
 
         friend_request = result.data
+
+        friend_request.status = FriendRequestStatus.CANCELED
 
         logger.info(
             "User canceled a friend request. %s %s %s",

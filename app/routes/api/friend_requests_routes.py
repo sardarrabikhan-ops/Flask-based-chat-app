@@ -7,7 +7,7 @@ from app.utils.decorators import api_login_required
 from app.schemas import ResponseBuilder, PaginationSchema
 
 from app.dependencies import Dependencies
-from app.results import FailureResult, ServiceResult
+from app.results import FailureResult
 
 deps = Dependencies()
 
@@ -75,45 +75,39 @@ def send_friend_request() -> ResponseReturnValue:
     return jsonify(body), status
 
 
-@api_friend_requests.patch("/accept")
+@api_friend_requests.patch("/<int:friend_request_id>/accept")
 @api_login_required
-def accept_friend_request() -> ResponseReturnValue:
-
-    payload = request.get_json(silent=True) or {}
+def accept_friend_request(friend_request_id: int) -> ResponseReturnValue:
 
     result = deps.friend_request_service.accept(
-        sender_id=deps.required_user.id,
-        receiver_id=payload.get("receiver_id"),
+        friend_request_id=friend_request_id,
+        actor_id=deps.required_user.id,
     )
 
     body, status = ResponseBuilder.build(result)
     return jsonify(body), status
 
 
-@api_friend_requests.patch("/reject")
+@api_friend_requests.patch("/<int:friend_request_id>/reject")
 @api_login_required
-def reject_friend_request() -> ResponseReturnValue:
-
-    payload = request.get_json(silent=True) or {}
+def reject_friend_request(friend_request_id: int) -> ResponseReturnValue:
 
     result = deps.friend_request_service.reject(
-        sender_id=deps.required_user.id,
-        receiver_id=payload.get("receiver_id"),
+        friend_request_id=friend_request_id,
+        actor_id=deps.required_user.id,
     )
 
     body, status = ResponseBuilder.build(result)
     return jsonify(body), status
 
 
-@api_friend_requests.delete("/cancel")
+@api_friend_requests.delete("/<int:friend_request_id>/cancel")
 @api_login_required
-def delete_friend_request() -> ResponseReturnValue:
-
-    payload = request.get_json(silent=True) or {}
+def delete_friend_request(friend_request_id: int) -> ResponseReturnValue:
 
     result = deps.friend_request_service.cancel(
-        sender_id=deps.required_user.id,
-        receiver_id=payload.get("receiver_id"),
+        friend_request_id=friend_request_id,
+        actor_id=deps.required_user.id,
     )
 
     body, status = ResponseBuilder.build(result)

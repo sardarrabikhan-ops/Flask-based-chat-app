@@ -32,6 +32,7 @@ def get_members(conversation_id: int) -> ResponseReturnValue:
 
     result = deps.conversation_member_service.get_conversation_members(
         conversation_id=conversation_id,
+        actor_id=deps.required_user.id,
         limit=pagination.limit,
         offset=pagination.offset,
     )
@@ -49,13 +50,10 @@ def get_member(conversation_id: int, user_id: int) -> ResponseReturnValue:
     result = deps.conversation_member_service.get_member(
         user_id=user_id,
         conversation_id=conversation_id,
+        actor_id=deps.required_user.id,
     )
 
-    if isinstance(result, FailureResult):
-        body, status = ResponseBuilder.build(result)
-        return jsonify(body), status
-
-    body, status = ResponseBuilder.build(ServiceResult.ok(result.data.user))
+    body, status = ResponseBuilder.build(result)
     return jsonify(body), status
 
 
@@ -96,9 +94,7 @@ def remove_member(conversation_id: int, user_id: int) -> ResponseReturnValue:
         body, status = ResponseBuilder.build(result)
         return jsonify(body), status
 
-    body, status = ResponseBuilder.build(
-        ServiceResult.ok(None)
-    )
+    body, status = ResponseBuilder.build(ServiceResult.ok(None))
     return jsonify(body), status
 
 
@@ -115,7 +111,5 @@ def leave_conversation(conversation_id: int) -> ResponseReturnValue:
         body, status = ResponseBuilder.build(result)
         return jsonify(body), status
 
-    body, status = ResponseBuilder.build(
-        ServiceResult.ok(None)
-    )
+    body, status = ResponseBuilder.build(ServiceResult.ok(None))
     return jsonify(body), status

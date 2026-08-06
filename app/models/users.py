@@ -75,7 +75,7 @@ class User(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    updates_at: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("CURRENT_TIMESTAMP"),

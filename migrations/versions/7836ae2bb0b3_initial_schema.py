@@ -1,8 +1,8 @@
 """Initial schema
 
-Revision ID: 1cc84e21d876
+Revision ID: 7836ae2bb0b3
 Revises: 
-Create Date: 2026-08-06 09:52:37.432483
+Create Date: 2026-08-06 19:54:57.276904
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1cc84e21d876'
+revision: str = '7836ae2bb0b3'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -40,7 +40,7 @@ def upgrade() -> None:
     sa.Column('failed_attempts', sa.Integer(), nullable=False),
     sa.Column('lock_until', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.Column('updates_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('status', sa.Enum('active', 'deleted', 'blocked', name='userstatus'), nullable=False),
     sa.CheckConstraint("status IN ('active', 'deleted', 'blocked')", name='ck_users_status_valid'),
     sa.CheckConstraint('failed_attempts BETWEEN 0 AND 20', name='ck_users_failed_attempts_range'),

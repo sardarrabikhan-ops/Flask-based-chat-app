@@ -1,6 +1,6 @@
 # app/routes/api/users_routes.py
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask.typing import ResponseReturnValue
 
 from app.utils.decorators import api_login_required
@@ -118,5 +118,6 @@ def delete_profile() -> ResponseReturnValue:
         body, status = ResponseBuilder.build(result)
         return jsonify(body), status
 
+    session.clear()
     body, status = ResponseBuilder.build(ServiceResult.ok(None))
     return jsonify(body), status

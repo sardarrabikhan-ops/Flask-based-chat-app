@@ -185,39 +185,6 @@ class BaseService:
 
         return ServiceResult.ok(friendship)
 
-    def _require_friend_request_between_users(
-        self,
-        sender_id: int | None,
-        receiver_id: int | None,
-        status: FriendRequestStatus | None = None,
-    ) -> Result[FriendRequest]:
-
-        sender_result = self._require_user(sender_id)
-
-        if isinstance(sender_result, FailureResult):
-            return sender_result
-
-        assert sender_id is not None
-
-        receiver_result = self._require_receiver(receiver_id)
-
-        if isinstance(receiver_result, FailureResult):
-            return receiver_result
-
-        assert receiver_id is not None
-
-        friend_request = self.friend_request_repository.get_one(
-            sender_id, receiver_id, status
-        )
-
-        if friend_request is None:
-            return ServiceResult.fail(
-                {"friend_request": "Friend request not found."},
-                code=ResultCode.NOT_FOUND,
-            )
-
-        return ServiceResult.ok(friend_request)
-
     def _require_friend_request(
         self, friend_request_id: int | None
     ) -> Result[FriendRequest]:
@@ -265,36 +232,6 @@ class BaseService:
 
         return ServiceResult.ok(user)
 
-    def _change_friend_request_status(
-        self,
-        sender_id: int | None,
-        receiver_id: int | None,
-        status: FriendRequestStatus,
-    ) -> Result[FriendRequest]:
-
-        friend_request_result = self._require_friend_request_between_users(
-            sender_id, receiver_id, FriendRequestStatus.PENDING
-        )
-
-        if isinstance(friend_request_result, FailureResult):
-            return friend_request_result
-
-        assert sender_id is not None
-        assert receiver_id is not None
-
-        friend_request = friend_request_result.data
-
-        is_friend = self.friend_repository.exists(sender_id, receiver_id)
-
-        if is_friend:
-            return ServiceResult.fail(
-                {"friendship": "Friendship already exists."}, code=ResultCode.CONFLICT
-            )
-
-        friend_request.status = status
-
-        return ServiceResult.ok(friend_request)
-
     def _create_friendship(self, user_id: int, friend_id: int) -> Result[Friend]:
 
         if user_id == friend_id:
@@ -324,3 +261,43 @@ class BaseService:
         friendship = self.friend_repository.create(friendship)
 
         return ServiceResult.ok(friendship)
+
+    def _require_friend_request_action(
+        self,
+        friend_request_id: int | None,
+        actor_id: int | None,
+        require_sender: bool,
+    ) -> Result[FriendRequest]:
+
+        user_result = self._require_user(actor_id)
+
+        if isinstance(user_result, FailureResult):
+            return user_result
+
+        friend_request_result = self._require_friend_request(friend_request_id)
+
+        if isinstance(friend_request_result, FailureResult):
+            return friend_request_result
+
+        friend_request = friend_request_result.data
+
+        if require_sender:
+            if friend_request.sender_id != actor_id:
+                return ServiceResult.fail(
+                    {"permission": "Only sender can perform this action."},
+                    code=ResultCode.FORBIDDEN,
+                )
+        else:
+            if friend_request.receiver_id != actor_id:
+                return ServiceResult.fail(
+                    {"permission": "Only receiver can perform this action."},
+                    code=ResultCode.FORBIDDEN,
+                )
+
+        if friend_request.status != FriendRequestStatus.PENDING:
+            return ServiceResult.fail(
+                {"friend_request": "Friend request is no longer pending."},
+                code=ResultCode.CONFLICT,
+            )
+
+        return ServiceResult.ok(friend_request)

@@ -60,7 +60,7 @@ def get_conversations() -> ResponseReturnValue:
 @api_login_required
 def get_conversation(conversation_id: int) -> ResponseReturnValue:
 
-    result = deps.conversation_member_service.get_member(
+    result = deps.conversation_member_service.get_membership(
         user_id=deps.required_user.id,
         conversation_id=conversation_id,
     )

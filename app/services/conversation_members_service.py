@@ -120,22 +120,45 @@ class ConversationMemberService(BaseService):
         )
         return ServiceResult.ok(membership, code=ResultCode.CREATED)
 
-    def get_member(
-        self, user_id: int | None, conversation_id: int | None
+    def get_membership(
+        self,
+        user_id: int | None,
+        conversation_id: int | None,
     ) -> Result[ConversationMember]:
         """Return the membership for the given user ID and conversation ID."""
 
         return self._require_membership(user_id, conversation_id)
 
+    def get_member(
+        self,
+        user_id: int | None,
+        conversation_id: int | None,
+        actor_id: int | None,
+    ) -> Result[User]:
+        """Return the membership for the given user ID and conversation ID."""
+
+        result = self._require_membership(user_id, conversation_id)
+
+        if isinstance(result, FailureResult):
+            return result
+
+        result = self._require_membership(actor_id, conversation_id)
+
+        if isinstance(result, FailureResult):
+            return result
+
+        return ServiceResult.ok(result.data.user)
+
     def get_conversation_members(
         self,
         conversation_id: int | None,
+        actor_id: int | None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> Result[Sequence[User]]:
         """Return the members for the given conversation ID."""
 
-        result = self._require_conversation(conversation_id)
+        result = self._require_membership(actor_id, conversation_id)
 
         if isinstance(result, FailureResult):
             return result

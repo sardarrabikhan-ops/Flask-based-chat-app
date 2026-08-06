@@ -37,6 +37,9 @@ def is_plural(value: int) -> str:
 def format_time(seconds: float) -> str:
     seconds = int(seconds)
 
+    if seconds == 0:
+        return "0 seconds."
+
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60

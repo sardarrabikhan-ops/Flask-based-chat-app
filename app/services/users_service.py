@@ -9,6 +9,7 @@ from app.validators import RegisterValidator, LoginValidator
 from app.constants import (
     UserStatus,
     FriendStatus,
+    FriendRequestStatus,
 )
 from app.results import ServiceResult, ResultCode, Result, FailureResult
 
@@ -238,6 +239,11 @@ class UserService(BaseService):
 
         for friendship in friendships:
             friendship.status = FriendStatus.REMOVED
+
+        friend_requests = self.friend_request_repository.get_by_sender_id(user_id, FriendRequestStatus.PENDING)
+
+        for friend_request in friend_requests:
+            friend_request.status = FriendRequestStatus.CANCELED
 
         logger.info("User deleted account. %s", user)
 

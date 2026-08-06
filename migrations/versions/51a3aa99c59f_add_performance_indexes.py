@@ -1,8 +1,8 @@
 """add performance indexes
 
-Revision ID: 6d38363372d6
-Revises: 1cc84e21d876
-Create Date: 2026-08-06 09:58:18.446132
+Revision ID: 51a3aa99c59f
+Revises: 7836ae2bb0b3
+Create Date: 2026-08-06 19:55:42.694621
 
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "6d38363372d6"
-down_revision: Union[str, Sequence[str], None] = "1cc84e21d876"
+revision: str = "51a3aa99c59f"
+down_revision: Union[str, Sequence[str], None] = "7836ae2bb0b3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
