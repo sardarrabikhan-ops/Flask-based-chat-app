@@ -54,7 +54,7 @@ def get_users() -> ResponseReturnValue:
 
 @api_users.get("/profile")
 @api_login_required
-def get_profile():
+def get_profile() -> ResponseReturnValue:
 
     result = deps.user_service.get_by_id(user_id=deps.required_user.id)
 
@@ -64,7 +64,7 @@ def get_profile():
 
 @api_users.get("/<int:user_id>")
 @api_login_required
-def get_public_profile(user_id: int):
+def get_public_profile(user_id: int) -> ResponseReturnValue:
 
     result = deps.user_service.get_by_id(user_id=user_id)
 

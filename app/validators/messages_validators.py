@@ -1,4 +1,4 @@
-# app/validators/messages_validatos.py
+# app/validators/messages_validators.py
 
 from app.validators import BaseValidator
 from app.constants import MESSAGE_MAX_LENGTH

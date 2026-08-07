@@ -1,8 +1,9 @@
-# app/shemas/request_schemas/pagination_schema.py
+# app/schemas/request_schemas/pagination_schema.py
 
 from dataclasses import dataclass
 
 from app.results import Result, ServiceResult
+from app.constants import MAX_PAGE_SIZE
 
 
 @dataclass(slots=True)
@@ -30,8 +31,8 @@ class PaginationSchema:
                 if limit <= 0:
                     errors["limit"] = "Limit must be more than 0."
 
-                if limit > 500:
-                    errors["limit"] = "Limit must be less than 500."
+                if limit > MAX_PAGE_SIZE:
+                    errors["limit"] = f"Limit cannot exceed {MAX_PAGE_SIZE}."
 
             except (TypeError, ValueError):
                 errors["limit"] = "Limit must be an integer."

@@ -7,5 +7,5 @@ from app.constants import ConversationMemberRole
 class ConversationMemberValidator(BaseValidator):
 
     @staticmethod
-    def user_role(role: str | None) -> str | None:
+    def role(role: str | None) -> str | None:
         return ConversationMemberValidator._validate_enum(role, "User role", ConversationMemberRole)

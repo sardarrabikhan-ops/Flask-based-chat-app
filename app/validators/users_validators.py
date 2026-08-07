@@ -100,7 +100,7 @@ class RegisterValidator(BaseValidator):
             return "Password must contain at least one digit."
 
         if not any(char in PASSWORD_SPECIAL_CHARACTERS for char in password):
-            return f"Password must contain at least one special character."
+            return "Password must contain at least one special character."
 
         return None
 

@@ -35,7 +35,7 @@ class ConversationMemberService(BaseService):
             ServiceResult containing the added membership or validation errors.
         """
 
-        if error := ConversationMemberValidator.user_role(role):
+        if error := ConversationMemberValidator.role(role):
             return ServiceResult.fail({"role": error})
 
         assert role is not None
@@ -135,7 +135,7 @@ class ConversationMemberService(BaseService):
         conversation_id: int | None,
         actor_id: int | None,
     ) -> Result[User]:
-        """Return the membership for the given user ID and conversation ID."""
+        """Return a conversation member's user if the actor is also a member."""
 
         result = self._require_membership(user_id, conversation_id)
 

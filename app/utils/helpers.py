@@ -30,7 +30,7 @@ def format_phone_number(phone_number: str) -> str:
     )
 
 
-def is_plural(value: int) -> str:
+def plural_suffix(value: int) -> str:
     return "s" if value != 1 else ""
 
 
@@ -47,13 +47,13 @@ def format_time(seconds: float) -> str:
     parts = []
 
     if hours:
-        parts.append(f"{hours} hour{is_plural(hours)}")
+        parts.append(f"{hours} hour{plural_suffix(hours)}")
 
     if minutes:
-        parts.append(f"{minutes} minute{is_plural(minutes)}")
+        parts.append(f"{minutes} minute{plural_suffix(minutes)}")
 
     if seconds:
-        parts.append(f"{seconds} second{is_plural(seconds)}")
+        parts.append(f"{seconds} second{plural_suffix(seconds)}")
 
     return " ".join(parts) + "."
 

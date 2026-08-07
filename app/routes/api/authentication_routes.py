@@ -9,7 +9,7 @@ from app.schemas import ResponseBuilder
 from app.dependencies import Dependencies
 from app.constants import SESSION_USER_ID
 
-from app.results import SuccessResult, ServiceResult, ResultCode
+from app.results import SuccessResult, ServiceResult
 
 deps = Dependencies()
 

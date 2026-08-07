@@ -8,7 +8,6 @@ from sqlalchemy import (
     DateTime,
     text,
     CheckConstraint,
-    UniqueConstraint,
     ForeignKey,
     Enum,
 )
