@@ -10,4 +10,4 @@ web_friend_requests = Blueprint("web_friend_requests", __name__, url_prefix="/fr
 @web_friend_requests.get("/")
 @login_required
 def friend_requests() -> str:
-    return render_template("friend_requests.html")
+    return render_template("index.html")

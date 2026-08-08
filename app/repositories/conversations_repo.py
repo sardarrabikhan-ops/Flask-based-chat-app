@@ -166,4 +166,5 @@ class ConversationRepository(BaseRepository):
 
     def create(self, conversation: Conversation) -> Conversation:
         self.session.add(conversation)
+        self.session.flush()
         return conversation

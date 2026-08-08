@@ -15,7 +15,12 @@ def configure_logging() -> None:
 
     logger = logging.getLogger()
 
-    if logger.handlers:
+    already_configured = any(
+        isinstance(h, RotatingFileHandler) or type(h) is logging.StreamHandler
+        for h in logger.handlers
+    )
+
+    if already_configured:
         return
 
     formatter = logging.Formatter(
